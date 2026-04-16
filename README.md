@@ -45,6 +45,7 @@ index.html              ← SDK script loader
 8. [Media Library](./08-media.md) — Images and file management
 9. [API Reference](./09-api-reference.md) — Complete API documentation
 10. [Global Elements](./10-global-elements.md) — Navbar, footer, Layout component
+11. [Slot-Based Templates](./11-slot-templates.md) — Numbered slot components with drag-and-drop ordering
 
 ## Quick Start
 

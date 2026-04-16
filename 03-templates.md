@@ -204,3 +204,4 @@ Use `data-cms-show-when` to show fields only for certain variant values:
 
 - [Pages & Elements](./05-pages.md) — DynamicPage pattern and `find()` helper
 - [Content Blocks](./04-content-blocks.md) — Simple `data-cms-id` editing without templates
+- [Slot-Based Templates](./11-slot-templates.md) — Numbered slot components with drag-and-drop ordering (project showcases, team grids, galleries)
