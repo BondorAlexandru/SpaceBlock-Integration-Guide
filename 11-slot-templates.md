@@ -262,6 +262,15 @@ All populated slots are collapsed into a labelled, draggable list. Each row show
 
 Expanding a slot shows its image (with Library picker), client, tags, URL, and variant fields — editable inline without leaving the panel.
 
+### Adding projects
+
+Below the accordion sits a dashed **Add project** button. Clicking it:
+1. Finds the next unpopulated slot in schema order (slot 1 first, then 2, …)
+2. Seeds `project-N-client` with `"Project N"` and `project-N-order` with the next sequential order value
+3. Sends `CMS_UPDATE` for both fields so the new row appears in the accordion and the iframe preview updates instantly
+
+The button also renders when zero slots are populated — this is how you create the first item on a freshly inserted block. It disappears once every slot declared in the schema is filled. Rename the seeded `Project N` label inline via the accordion once you've added the row.
+
 ### Drag-and-drop ordering
 
 Dragging a row to a new position immediately:
@@ -286,7 +295,7 @@ The same approach works for any numbered list of items. Change the prefix to mat
 | Testimonials | `testimonial-N-` | `testimonial-N-order` |
 | FAQ items | `question-N-` | `question-N-order` |
 
-The Visual Editor groups any schema that has `project-N-*`-style fields — as long as the prefix before the number is `project`. For other prefixes use the same structure; the CMS uses the `client`-equivalent field (the first text field in the slot) as the row label in the drag list.
+The Visual Editor groups any schema that has `project-N-*`-style fields — as long as the prefix before the number is `project`. For other prefixes use the same structure; the CMS uses the `client`-equivalent field (the first text field in the slot) as the row label in the drag list. The **Add project** button also requires a `project-N-client` field to seed — schemas without one will not get the add button.
 
 ## Checklist
 
