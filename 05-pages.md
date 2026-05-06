@@ -11,8 +11,15 @@ Pages are CMS-managed URLs whose content is built from a list of reorderable **P
 ## Fetching Pages
 
 ```ts
-const { page, elements } = await fetchPage(slug)
+const result = await fetchPage(slug)
+if (!result) {
+  // Page doesn't exist yet — render the missing-page state and stop.
+  return
+}
+const { page, elements } = result
 ```
+
+`fetchPage(slug)` returns `null` on a 404 (the page hasn't been created in the CMS yet) and throws on every other failure. This is deliberate: a missing page is a normal operating condition during onboarding and shouldn't surface as an exception. Other errors (5xx, network failures) still throw so they get noticed.
 
 Response shape:
 
@@ -78,15 +85,19 @@ export function DynamicPage() {
   const slug = (params['*'] ?? location.pathname.replace(/^\//, '')) || 'home'
 
   const [data, setData] = useState<{ page: Page; elements: PageElement[] } | null>(null)
+  const [pageMissing, setPageMissing] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const insertTimestamps = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
+    setPageMissing(false)
+
     const cached = pageCache.get(slug)
     if (cached) { setData({ page: cached.page, elements: cached.elements }); return }
 
     fetchPage(slug)
       .then(result => {
+        if (!result) { setData(null); setPageMissing(true); return }
         pageCache.set(slug, { ...result, timestamp: Date.now() })
         setData(result)
       })
@@ -264,28 +275,43 @@ Mark the render container with `data-cms-zone` so the Visual Editor knows where 
 
 If you have multiple zones (e.g. `main` + `sidebar`), filter and render each zone separately.
 
-## HomePage — Static Composition Variant
+## The Homepage Is Just `slug=home`
 
-`HomePage.tsx` is a sibling pattern: it doesn't fetch a `Page`, it renders a fixed composition of section components and feeds them content fetched from the simple **content blocks** API (`fetchContent()`). Each section gets a stable `elementId` like `home-hero`, so its field keys end up as `home-hero-title`, `home-hero-description`, etc. — readable and unique across the site.
+Don't write a separate `HomePage` component. `DynamicPage` handles `/` automatically: when there's no splat, it falls back to slug `home` and fetches the corresponding CMS page.
 
-It listens for the same `CMS_UPDATE` postMessage and the same `<img src>` `MutationObserver`, but patches its flat content map instead of a per-element store.
-
-```tsx
-useEffect(() => {
-  function patch(key: string, value: string) {
-    setContent(prev => (prev[key] === value ? prev : { ...prev, [key]: value }))
-  }
-
-  function handleMessage(event: MessageEvent<CmsMessage>) {
-    if (event.data?.type !== 'CMS_UPDATE') return
-    // ...unwrap value...
-    patch(event.data.cmsId, value)
-  }
-  // ...same MutationObserver as DynamicPage...
-}, [])
+```ts
+const splat = params['*']
+const slug = (splat ?? location.pathname.replace(/^\//, '')) || 'home'
 ```
 
-Use this pattern for any page where the layout is fixed in code but the copy is editable.
+In `App.tsx`, route `/blog*` to the blog pages and **everything else** to `DynamicPage`:
+
+```tsx
+<Routes>
+  <Route path="/blog" element={<BlogListPage />} />
+  <Route path="/blog/preview/:token" element={<BlogPreviewPage />} />
+  <Route path="/blog/:slug" element={<BlogPostPage />} />
+  <Route path="/*" element={<DynamicPage />} />
+</Routes>
+```
+
+This is deliberate: page composition (which sections in which order, with what content) is a CMS concern, not a code concern. Editors build the homepage by creating a `home` page in SpaceBlock and dropping templates onto it. New marketing pages don't need code changes — just a new page in the CMS at the desired slug.
+
+If a slug doesn't exist yet (e.g. fresh install with no `home` page in the CMS), `fetchPage` returns `null` and `DynamicPage` flips a `pageMissing` flag. In **dev mode**, render a panel that tells you what to do; in production, render an empty `<main>`:
+
+```tsx
+{pageMissing && import.meta.env.DEV && (
+  <div className="px-8 py-24 max-w-2xl mx-auto">
+    <p className="text-sm uppercase tracking-[0.1em] text-pannu-muted">No page yet</p>
+    <h1 className="mt-4 text-3xl">No CMS page found for <code>/{slug}</code></h1>
+    <p className="mt-4">
+      Create a page with this slug in the SpaceBlock editor and drop templates onto it.
+    </p>
+  </div>
+)}
+```
+
+This is the on-ramp: a fresh install will hit `/` → 404 on `home` → see the panel → know to create the page. The browser will still log the 404 in the network tab; that's expected and informative.
 
 ## Best Practices
 

@@ -18,11 +18,10 @@ src/
       SimpleText.tsx
       RichText.tsx
   pages/
-    DynamicPage.tsx     ← catch-all CMS page renderer
+    DynamicPage.tsx     ← catch-all CMS page renderer (also handles `/` as slug `home`)
     BlogPostPage.tsx
     BlogListPage.tsx
     BlogPreviewPage.tsx
-    HomePage.tsx
   lib/
     api.ts              ← all SpaceBlock fetch helpers
     types.ts            ← TypeScript interfaces
@@ -50,19 +49,23 @@ index.html              ← SDK script loader
 ## Quick Start
 
 ```html
-<!-- index.html — load the SDK -->
+<!-- index.html — load the SDK from the same origin as the CMS -->
 <script>
-  (function() {
-    var isLocalhost = window.location.hostname === 'localhost';
+  (function () {
+    var base = '%VITE_SPACEBLOCK_API_BASE%';
+    if (!base || base.indexOf('%VITE_') === 0) {
+      console.warn('[SpaceBlock] VITE_SPACEBLOCK_API_BASE is not set; SDK will not load.');
+      return;
+    }
     var script = document.createElement('script');
-    script.src = isLocalhost
-      ? 'http://localhost:3000/spaceblock-sdk.js'
-      : 'https://www.spaceblock.app/spaceblock-sdk.js';
+    script.src = base.replace(/\/$/, '') + '/spaceblock-sdk.js';
     script.defer = true;
     document.head.appendChild(script);
   })();
 </script>
 ```
+
+The SDK must come from the same origin as the CMS so the editor's iframe messaging works. Vite substitutes `%VITE_SPACEBLOCK_API_BASE%` from `.env` at both dev and build time. **Don't branch the SDK URL on `window.location.hostname`** — your dev server is on localhost, but the CMS is wherever `VITE_SPACEBLOCK_API_BASE` points.
 
 ```tsx
 // src/App.tsx — initialise once React has mounted
@@ -94,11 +97,18 @@ export default function App() {
 
   return (
     <Layout>
-      <Routes>...</Routes>
+      <Routes>
+        <Route path="/blog" element={<BlogListPage />} />
+        <Route path="/blog/preview/:token" element={<BlogPreviewPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        <Route path="/*" element={<DynamicPage />} />
+      </Routes>
     </Layout>
   )
 }
 ```
+
+`DynamicPage` handles every CMS-managed URL — including `/`, which it loads as slug `home`. Don't add a separate `HomePage` component; everything that's editable in the CMS flows through `DynamicPage`. Editors create the home page in SpaceBlock and drop templates onto it.
 
 ```
 # .env.local

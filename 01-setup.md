@@ -20,18 +20,21 @@ Use a dynamic loader so the SDK fetches from localhost when developing and from 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My App</title>
 
-    <!-- SpaceBlock CMS SDK — loaded from prod or local CMS depending on host -->
+    <!--
+      SpaceBlock CMS SDK loader.
+      The SDK must come from the same origin as the CMS so the editor's iframe
+      messaging works. Vite substitutes %VITE_SPACEBLOCK_API_BASE% from .env at
+      both dev and build time.
+    -->
     <script>
       (function () {
-        var isLocalhost =
-          window.location.hostname === 'localhost' ||
-          window.location.hostname === '127.0.0.1';
-        var sdkUrl = isLocalhost
-          ? 'http://localhost:3000/spaceblock-sdk.js'
-          : 'https://www.spaceblock.app/spaceblock-sdk.js';
-
+        var base = '%VITE_SPACEBLOCK_API_BASE%';
+        if (!base || base.indexOf('%VITE_') === 0) {
+          console.warn('[SpaceBlock] VITE_SPACEBLOCK_API_BASE is not set; SDK will not load.');
+          return;
+        }
         var script = document.createElement('script');
-        script.src = sdkUrl;
+        script.src = base.replace(/\/$/, '') + '/spaceblock-sdk.js';
         script.defer = true;
         document.head.appendChild(script);
       })();
@@ -43,6 +46,8 @@ Use a dynamic loader so the SDK fetches from localhost when developing and from 
   </body>
 </html>
 ```
+
+> **Don't branch the SDK URL on `window.location.hostname`.** Your dev server runs on `localhost` but the CMS lives wherever `VITE_SPACEBLOCK_API_BASE` points. If you hardcode `localhost:3000` for the SDK in dev, the script tag silently fails to load (unless you're also running SpaceBlock locally), `window.SpaceBlock` is never defined, and the editor sees zero templates. Always derive the SDK origin from the env var.
 
 ## 2. Environment Variables
 

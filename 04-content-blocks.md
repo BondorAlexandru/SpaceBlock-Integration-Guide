@@ -124,16 +124,22 @@ The underlying API returns:
 }
 ```
 
+## When to Use Content Blocks vs Page Elements
+
+**Prefer page elements** ([Pages & Elements](./05-pages.md)) for any composable page where editors should be able to add, remove, reorder, or swap sections. That includes the homepage and every marketing page in this project — they all flow through `DynamicPage`.
+
+**Use content blocks** for individual values bound to a fixed UI component that lives in code — e.g. a tagline inside a static `Banner`, a copyright string in the footer, or per-section copy on a landing page that's intentionally not a CMS page.
+
 ## React Integration (Vite + React)
 
 Use `fetchContent()` from `src/lib/api.ts` which returns a `Record<string, string>` keyed by `contentId`:
 
 ```tsx
-// src/pages/HomePage.tsx
+// src/components/AnnouncementBanner.tsx — illustrative; this banner lives in code
 import { useEffect, useState } from 'react'
 import { fetchContent } from '@/lib/api'
 
-export function HomePage() {
+export function AnnouncementBanner() {
   const [content, setContent] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -141,25 +147,14 @@ export function HomePage() {
   }, [])
 
   return (
-    <main>
-      <h1 data-cms-id="home-title">
-        {content['home-title'] ?? 'Default Title'}
-      </h1>
-      <div
-        data-cms-id="home-intro"
-        data-cms-type="richtext"
-        className="rich-content"
-        dangerouslySetInnerHTML={{
-          __html: content['home-intro'] ?? '<p>Default intro text.</p>'
-        }}
-      />
-      <img
-        data-cms-id="home-hero-image"
-        data-cms-type="image"
-        src={content['home-hero-image'] ?? '/placeholder.jpg'}
-        alt="Hero"
-      />
-    </main>
+    <aside className="bg-pannu-section py-3 px-6">
+      <span data-cms-id="announcement-text">
+        {content['announcement-text'] ?? 'Default announcement.'}
+      </span>
+      <a data-cms-id="announcement-link" data-cms-type="url" href={content['announcement-link'] ?? '#'}>
+        Learn more
+      </a>
+    </aside>
   )
 }
 ```

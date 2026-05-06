@@ -2,128 +2,76 @@
 
 Global elements (navbar, footer, CTA, etc.) are configured once per project and available on every page. They live in `src/components/layout/`.
 
-## Registering Global Elements from Your App
+## Creating Global Elements
 
-External apps register their global elements via the **public upsert API**. No seed scripts or CMS-side setup required — your app declares which global elements it needs and the CMS creates them automatically.
+Global elements are **created in the SpaceBlock dashboard**, not from your app at runtime. Your React app only **reads** global elements (via `fetchGlobalElement`) and listens for `GLOBAL_ELEMENT_UPDATE` postMessage events from the editor.
 
-### PUT `/api/public/global-elements/:projectId`
+### Why not auto-register from the browser?
 
-Upserts (creates or updates) a global element. Authenticate with your project API key.
+The PUT endpoint at `/api/public/global-elements/:projectId` exists, but **CORS preflight blocks `PUT` from browser origins** — so calling it from your React app at startup fails with `Method PUT is not allowed by Access-Control-Allow-Methods`. GET works, POST may, but PUT is rejected. Don't try to write a browser-side seed helper; it won't work and silently failing PUTs will pollute your console.
 
-**Request:**
+### How to create them
+
+1. Open the SpaceBlock dashboard for your project.
+2. Find the **Global Elements** section (or wherever your CMS surfaces project-level singletons).
+3. Create one record per element your app needs:
+   - `navbar` (type: `navbar`)
+   - `footer` (type: `footer`)
+   - `cta` (type: `cta`) — only if you're using `GlobalCta`
+4. Fill in the content shape your component expects (see "Content Types" below).
+
+After they exist in the CMS, your `Navbar` / `Footer` components fetch them on mount and re-render on every editor change.
+
+### Server-side seeding via `npm run seed:globals`
+
+The recommended way to bootstrap navbar/footer (and any future global elements) is a Node script invoked via npm. CORS doesn't apply to Node, so PUT works.
+
+`scripts/seed-global-elements.mjs` reads `.env.local`, fetches the existing elements, and only PUTs ones whose `elementId` is missing — so re-running it is safe and won't clobber editor changes.
+
+```bash
+npm run seed:globals
+```
+
+Sample output on a fresh project:
+
+```
+→ Fetching existing global elements at https://www.spaceblock.app/api/public/global-elements/<projectId>
+  Found 0 existing element(s): []
+→ Creating navbar (type=navbar)... OK
+→ Creating footer (type=footer)... OK
+
+Done. Created 2, skipped 0.
+```
+
+To customize the seeded defaults, edit `DEFAULT_GLOBAL_ELEMENTS` in `scripts/seed-global-elements.mjs`. To seed during deploy, add `npm run seed:globals` to your CI step (idempotent, so safe to run every deploy).
+
+### Manual seeding via `curl`
+
+If you'd rather not check in the script, the same effect with a one-liner:
 
 ```bash
 curl -X PUT \
-  "https://your-cms.com/api/public/global-elements/PROJECT_ID?apiKey=YOUR_API_KEY" \
+  "https://www.spaceblock.app/api/public/global-elements/$PROJECT_ID?apiKey=$API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "elementId": "cta",
-    "type": "cta",
-    "content": {
-      "variant": "dark",
-      "text": "Ready to get started?",
-      "buttonText": "Learn More",
-      "buttonUrl": "/apply",
-      "buttonIcon": ""
-    }
+    "elementId": "navbar",
+    "type": "navbar",
+    "content": { "logoAlt": "My App", "items": [] }
   }'
 ```
 
-**Body fields:**
+Repeat for `footer`, etc. PUT is an upsert — it creates if missing, updates if present.
+
+### PUT API reference
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `elementId` | Yes | Unique ID within the project (e.g. `"navbar"`, `"cta"`) |
+| `elementId` | Yes | Unique ID within the project (e.g. `"navbar"`) |
 | `type` | Yes | Element type — drives which CMS editor is shown |
 | `content` | No | JSON content object (defaults to `{}`) |
 | `customization` | No | JSON customization object (defaults to `{}`) |
 | `order` | No | Display order (auto-assigned if omitted) |
 | `isActive` | No | Whether element is active (defaults to `true`) |
-
-**Response (200):**
-
-```json
-{
-  "element": {
-    "id": "ge_abc123",
-    "elementId": "cta",
-    "type": "cta",
-    "content": { ... },
-    "customization": {},
-    "order": 2,
-    "isActive": true
-  }
-}
-```
-
-If the element already exists (matched by `elementId`), it updates the existing record. If not, it creates a new one.
-
-### Registering on App Startup
-
-Call the upsert endpoint from your app's initialization to ensure global elements exist:
-
-```typescript
-// src/lib/register-global-elements.ts
-
-const API_BASE = import.meta.env.VITE_CONTENTLITE_API_BASE;
-const API_KEY = import.meta.env.VITE_CONTENTLITE_API_KEY;
-const PROJECT_ID = import.meta.env.VITE_CONTENTLITE_PROJECT_ID;
-
-const GLOBAL_ELEMENTS = [
-  {
-    elementId: 'navbar',
-    type: 'navbar',
-    content: {
-      logo: '/media/logo.svg',
-      logoAlt: 'My App',
-      items: [],
-    },
-  },
-  {
-    elementId: 'footer',
-    type: 'footer',
-    content: {
-      columns: [],
-      copyright: '© 2026',
-    },
-  },
-  {
-    elementId: 'cta',
-    type: 'cta',
-    content: {
-      variant: 'dark',
-      text: 'Ready to get started?',
-      buttonText: 'Learn More',
-      buttonUrl: '/apply',
-    },
-  },
-];
-
-export async function registerGlobalElements() {
-  for (const element of GLOBAL_ELEMENTS) {
-    try {
-      await fetch(
-        `${API_BASE}/global-elements/${PROJECT_ID}?apiKey=${API_KEY}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(element),
-        }
-      );
-    } catch {
-      // Silently skip — elements may already exist
-    }
-  }
-}
-```
-
-Call it once on startup (e.g. in `main.tsx` or `App.tsx`):
-
-```typescript
-import { registerGlobalElements } from '@/lib/register-global-elements';
-
-registerGlobalElements(); // fire-and-forget
-```
 
 ## File Structure
 
@@ -373,8 +321,9 @@ Each global element component listens for its own `GLOBAL_ELEMENT_UPDATE` event 
 
 ## Best Practices
 
-1. **Register elements from your app** — use the PUT upsert API on startup so the CMS always has the elements your app expects
-2. **Always provide defaults** — your UI must work before the CMS is configured
-3. **Merge with defaults** — `setContent({ ...DEFAULT_CONTENT, ...data })` so missing fields fall back gracefully
-4. **Support legacy `links`** — check `items` first, fall back to `links` for backward compatibility
-5. **Keep layout thin** — `Layout.tsx` only renders Navbar, children, Footer, GlobalCta, and TemplateRegistry; no business logic
+1. **Don't write a browser-side auto-register helper** — CORS blocks PUTs from browser origins. The Cosmos pattern is to create global elements in the SpaceBlock dashboard and consume them via GET only.
+2. **Always provide defaults in the component** — `Navbar.tsx` and `Footer.tsx` should render reasonable content before any fetch resolves AND when the CMS doesn't have a record yet. The component is the safety net.
+3. **Merge with defaults** — `setContent({ ...DEFAULT_CONTENT, ...data })` so missing fields fall back gracefully when the CMS returns a partial record.
+4. **Support legacy `links`** — check `items` first, fall back to `links` for backward compatibility.
+5. **Keep layout thin** — `Layout.tsx` only renders Navbar, children, Footer, GlobalCta, and TemplateRegistry; no business logic.
+6. **For deploy-time seeding, use a server-side `curl`** — never browser-side. PUT is unblocked from a server, blocked from a browser.
