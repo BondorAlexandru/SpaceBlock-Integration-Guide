@@ -411,6 +411,17 @@ Fetches a page and all its elements.
 GET /api/public/pages/{projectId}/{pageSlug}
 ```
 
+**Preview mode:** Unpublished (draft) pages return `404` on this endpoint.
+To fetch a draft (e.g. inside the Visual Editor), put the request in preview
+mode using any of:
+
+- `?cms-preview=true` query parameter (recommended — forward this from your
+  `publicUrl()` builder when the current page URL has `cms-preview=true`)
+- `X-CMS-Preview: true` or `X-Spaceblock-Preview: true` request header
+- A same-origin `Referer` containing `cms-preview=true`
+
+Preview responses bypass the cache and are returned with no-cache headers.
+
 **Response:**
 
 ```json

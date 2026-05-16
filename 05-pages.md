@@ -21,6 +21,12 @@ const { page, elements } = result
 
 `fetchPage(slug)` returns `null` on a 404 (the page hasn't been created in the CMS yet) and throws on every other failure. This is deliberate: a missing page is a normal operating condition during onboarding and shouldn't surface as an exception. Other errors (5xx, network failures) still throw so they get noticed.
 
+> ⚠️ **An unpublished (draft) page also returns `404`** — so it is
+> indistinguishable from "not created yet" and renders as the missing-page
+> state, with none of its blocks. To edit a draft in the Visual Editor your
+> requests must forward CMS preview mode; see
+> [Draft Pages & CMS Preview](#draft-pages--cms-preview) below.
+
 Response shape:
 
 ```json
@@ -54,6 +60,16 @@ function publicUrl(path: string, params?: Record<string, string | undefined>): s
   const url = new URL(`${API_BASE}${path}`)
   url.searchParams.set('apiKey', API_KEY)
   url.searchParams.set('_t', Date.now().toString())
+
+  // Forward CMS preview mode so draft pages are returned while editing.
+  // The editor opens the iframe with ?cms-preview=true; without this,
+  // the cross-origin Referer is stripped and the API can't detect preview.
+  if (typeof window !== 'undefined') {
+    const sp = new URLSearchParams(window.location.search)
+    if (sp.get('cms-preview') === 'true' || sp.get('cms-preview') === '1') {
+      url.searchParams.set('cms-preview', 'true')
+    }
+  }
   // ...
 }
 
@@ -65,6 +81,28 @@ async function get<T>(url: string): Promise<T> {
   // ...
 }
 ```
+
+## Draft Pages & CMS Preview
+
+The public pages API hides unpublished pages from the world: a draft page
+returns `404` from `/api/public/pages/{projectId}/{pageSlug}`, so
+`fetchPage()` returns `null` and `DynamicPage` falls through to the
+missing-page state — **none of the page's blocks render**.
+
+The Visual Editor previews your live site in an iframe and appends
+`?cms-preview=true` to the URL so the API can serve drafts while you edit.
+That flag only reaches the API if **your fetch forwards it**: the browser's
+default `strict-origin-when-cross-origin` referrer policy strips the query
+string from the cross-origin `Referer`, so the API cannot detect preview
+mode on its own.
+
+The `publicUrl()` builder above already forwards it — because every public
+fetch (`fetchPage`, `fetchPages`, `fetchContent`, …) goes through
+`publicUrl()`, drafts render correctly inside the editor with no other
+changes. The forwarding is a no-op in production (the flag is absent), so
+cached, published responses are unaffected. The API also accepts an
+`X-CMS-Preview: true` (or `X-Spaceblock-Preview: true`) header as an
+alternative to the query parameter.
 
 ## DynamicPage Pattern
 
