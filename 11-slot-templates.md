@@ -259,6 +259,7 @@ All populated slots are collapsed into a labelled, draggable list. Each row show
 - A **drag handle** (six-dot grip icon)
 - The slot's **client name** as the row label
 - A **chevron** to expand the slot's individual fields
+- A **delete** control (trash icon) — empties the slot (see [Deleting a slot](#deleting-a-slot))
 
 Expanding a slot shows its image (with Library picker), client, tags, URL, and variant fields — editable inline without leaving the panel.
 
@@ -270,6 +271,19 @@ Dragging a row to a new position immediately:
 3. Sends a `CMS_UPDATE` postMessage for every changed order field so the live preview re-sorts instantly
 
 Clicking **Save** persists the new order values to the database. On next page load the Showcase reads `project-N-order` and sorts accordingly.
+
+### Deleting a slot
+
+Each accordion row has a delete (trash) control. The row maps to a **stable slot index `N`**, not its display position. Deleting it:
+
+1. **Clears every field of slot `N`** — `image`, `client`, `tags`, `url`, `order`, `variant` are all set to empty. The element itself and the slot's schema keys are **not** removed: slot `N` stays defined so it remains reusable by **Add project** and the `project-N-*` pattern still detects (it needs ≥2 slot numbers present).
+2. **Emits one `CMS_UPDATE` postMessage per cleared field** — `{ type: 'CMS_UPDATE', cmsId: '{elementId}-project-{N}-{field}', content: '' }`. One message per field (the preview keys updates by `cmsId`; a single bulk message will not work). The live preview drops the card instantly with **no full reload**.
+3. Does **not** send `CMS_REFRESH_AFTER_DELETE` — that event is reserved for whole-section deletion and would tear down the entire Showcase.
+4. Does **not** renumber other slots. Their content and `order` are untouched. (Display order may optionally be compacted by writing fresh `project-M-order` integers, but it isn't required — the component skips empty slots and sorts by `order ?? slot`.)
+
+Clicking **Save** persists the emptied values. The slot stays gone after reload because the component hides any slot where **both `image` and `client` are empty** — the `populated.filter(p => p.image || p.client)` rule shown in the [Showcase Component](#showcase-component). That same filter is why the now-empty slot can be repopulated later by **Add project**.
+
+> The **Add project** affordance stays available even when zero slots are populated, so a fully cleared Showcase can be rebuilt from scratch.
 
 ### Detection threshold
 
@@ -296,7 +310,8 @@ The Visual Editor groups any schema that has `project-N-*`-style fields — as l
 4. Sort `projects` by `order ?? slot` before rendering
 5. Register `<Showcase />` in `TemplateRegistry`
 6. Add a detection branch in `renderElement()` matching `elementId.includes('showcase') || templateName === 'Showcase'`
-7. Click **Save** in the Visual Editor after reordering to persist the new order
+7. Click **Save** in the Visual Editor after reordering or deleting to persist the changes
+8. Keep the empty-slot filter (`p.image || p.client`) — it powers Add **and** Delete: an emptied slot disappears from the render while its schema stays for reuse
 
 ## Next Steps
 
