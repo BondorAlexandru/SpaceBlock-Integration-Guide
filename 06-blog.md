@@ -38,8 +38,19 @@ interface BlogPost {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  seo?: {
+    title: string | null;
+    description: string | null;
+    image: string | null;       // absolute URL, 1200x630
+    canonical: string | null;
+    type: 'website' | 'article' | null;
+    noindex: boolean | null;
+  };
 }
 ```
+
+The optional `seo` object powers social-share link previews (Open Graph /
+Twitter cards). See [SEO & Social Metadata](./12-seo-metadata.md).
 
 ## Content Block Types
 

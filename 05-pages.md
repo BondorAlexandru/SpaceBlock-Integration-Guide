@@ -51,6 +51,8 @@ Response shape:
 
 Note that image fields can come back as either a plain string or `{ url, text }` — the `findImage` helper handles both.
 
+The `page` object also includes an optional `seo` object (title, description, image, canonical, type, noindex) that powers social-share previews. See [SEO & Social Metadata](./12-seo-metadata.md).
+
 ## Cache-busting and `cache: 'no-store'`
 
 `api.ts` adds a `_t=Date.now()` query parameter and uses `fetch(url, { cache: 'no-store' })` on every request. This is essential while the CMS editor is open — without it, browsers and proxies will return stale page data and edits won't appear.

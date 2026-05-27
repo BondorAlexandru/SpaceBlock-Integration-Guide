@@ -194,7 +194,15 @@ GET /api/public/blog
       },
       "tags": ["tutorial", "getting-started"],
       "publishedAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z"
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "seo": {
+        "title": "Getting Started with SpaceBlock",
+        "description": "A step-by-step guide to integrating SpaceBlock into your site.",
+        "image": "https://cdn.example.com/og/getting-started.png",
+        "canonical": "https://mysite.com/blog/getting-started",
+        "type": "article",
+        "noindex": false
+      }
     }
   ],
   "total": 25,
@@ -252,7 +260,15 @@ GET /api/public/blog/{slug}
       "avatar": "https://cdn.example.com/avatar.jpg"
     },
     "tags": ["tutorial"],
-    "publishedAt": "2024-01-15T10:30:00Z"
+    "publishedAt": "2024-01-15T10:30:00Z",
+    "seo": {
+      "title": "Getting Started with SpaceBlock",
+      "description": "A step-by-step guide to integrating SpaceBlock into your site.",
+      "image": "https://cdn.example.com/og/getting-started.png",
+      "canonical": "https://mysite.com/blog/getting-started",
+      "type": "article",
+      "noindex": false
+    }
   }
 }
 ```
@@ -388,7 +404,15 @@ GET /api/public/pages/{projectId}/list
       "path": "/",
       "title": "Welcome - My Site",
       "description": "Homepage meta description",
-      "createdAt": "2024-01-15T10:30:00Z"
+      "createdAt": "2024-01-15T10:30:00Z",
+      "seo": {
+        "title": "Welcome - My Site",
+        "description": "The official home of My Site.",
+        "image": "https://cdn.example.com/og/home.png",
+        "canonical": "https://mysite.com/",
+        "type": "website",
+        "noindex": false
+      }
     },
     {
       "id": "page-456",
@@ -432,7 +456,15 @@ Preview responses bypass the cache and are returned with no-cache headers.
     "slug": "home",
     "path": "/",
     "title": "Welcome - My Site",
-    "description": "Homepage meta description"
+    "description": "Homepage meta description",
+    "seo": {
+      "title": "Welcome - My Site",
+      "description": "The official home of My Site.",
+      "image": "https://cdn.example.com/og/home.png",
+      "canonical": "https://mysite.com/",
+      "type": "website",
+      "noindex": false
+    }
   },
   "elements": [
     {
@@ -450,6 +482,31 @@ Preview responses bypass the cache and are returned with no-cache headers.
   ]
 }
 ```
+
+#### Server-side Render (SEO meta injection)
+
+Returns the consumer's `index.html` shell with per-slug SEO/social meta tags
+injected, so social crawlers (which don't run JavaScript) get rich link
+previews. This is the only endpoint that returns `text/html` rather than JSON.
+
+```
+GET /api/public/render/{projectId}/{slug}        → page by slug
+GET /api/public/render/{projectId}/blog/{slug}   → blog post by slug
+GET /api/public/render/{projectId}               → home page (empty slug)
+```
+
+- Replaces the block between `<!-- seo:start -->` and `<!-- seo:end -->` in the
+  shell with the resolved `<title>`, `<meta>`, and `<link rel="canonical">`
+  tags. The SPA still boots normally for human visitors.
+- **Unknown or unpublished slug → HTTP `404`** with the shell and
+  `<meta name="robots" content="noindex,nofollow">` injected (never a 500).
+- `?cms-preview=true` resolves unpublished/draft content and responds with
+  `no-store`.
+- `og:image` / `og:url` / canonical are always absolute. The shell is fetched
+  from the project's configured **Site URL** and cached ~60s.
+
+See [SEO & Social Metadata](./12-seo-metadata.md) for the full guide, the exact
+tag block, fallback rules, and host-rewrite setup.
 
 ---
 
