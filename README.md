@@ -45,6 +45,8 @@ index.html              ← SDK script loader
 9. [API Reference](./09-api-reference.md) — Complete API documentation
 10. [Global Elements](./10-global-elements.md) — Navbar, footer, Layout component
 11. [Slot-Based Templates](./11-slot-templates.md) — Numbered slot components with drag-and-drop ordering
+12. [SEO & Social Metadata](./12-seo-metadata.md) — Per-page SEO and Open Graph tags
+13. [Editor-Only DOM](./13-editor-only-dom.md) — Gate hidden CMS field markers so public visitors don't fetch them
 
 ## Quick Start
 
