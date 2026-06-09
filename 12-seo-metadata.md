@@ -120,8 +120,31 @@ The exact tag set emitted into the `seo:start … seo:end` block:
 <meta name="twitter:title" content="{title}" />
 <meta name="twitter:description" content="{description}" />
 <meta name="twitter:image" content="{absolute image}" />
+<!-- Below tags are emitted ONLY when the matching project SEO setting is filled in. -->
+<meta name="twitter:site" content="{twitterSite}" />
+<meta name="twitter:creator" content="{twitterCreator}" />
+<meta name="google-site-verification" content="{googleVerification}" />
+<meta name="msvalidate.01" content="{bingVerification}" />
 <link rel="canonical" href="{absolute url}" />
+<!-- Organization JSON-LD emitted only when `organizationLogo` is set. `sameAs` is
+     populated from the newline-separated list of profile URLs. -->
+<script type="application/ld+json">{Organization schema}</script>
 ```
+
+### Optional project-level settings
+
+In addition to the four required defaults (site name, default description, default
+image, Site URL), the **Project → SEO** dashboard exposes optional fields. Each is
+emitted into the page `<head>` only when filled in; blank values are silently skipped.
+
+| Field | Tag emitted | What it does |
+|---|---|---|
+| `twitterSite` | `<meta name="twitter:site">` | Org Twitter handle (with leading `@`). Improves card attribution. |
+| `twitterCreator` | `<meta name="twitter:creator">` | Default author handle. Per-post overrides happen at the post level. |
+| `googleVerification` | `<meta name="google-site-verification">` | Search Console ownership verification. Paste the bare `content` value. |
+| `bingVerification` | `<meta name="msvalidate.01">` | Bing Webmaster ownership verification. |
+| `organizationLogo` | (drives the JSON-LD below) | Square brand-mark URL. Opt-in: setting this emits an Organization schema block on every page. |
+| `organizationSameAs` | `sameAs:[...]` in the Organization schema | Newline-separated canonical social-profile / Wikipedia / Crunchbase URLs. Helps Google's brand knowledge panel verify the entity. Used only when `organizationLogo` is set. |
 
 ## 4. Host rewrite
 
