@@ -226,10 +226,16 @@ export function getPublicApiHeaders(
     return headers
   }
 
-  const swr = options?.staleWhileRevalidate ?? 7 * 24 * 3600 // 7 days
-  headers['Cache-Control'] = `public, max-age=0, s-maxage=${maxAge}, stale-while-revalidate=${swr}`
-  headers['Vercel-CDN-Cache-Control'] = `public, max-age=${maxAge}, stale-while-revalidate=${swr}`
-  // NOTE: do NOT emit `CDN-Cache-Control: no-store` — that was the kill switch.
+  // UPDATE (2026-06-11): CMS API responses are NO LONGER edge-cached.
+  // The s-maxage + stale-while-revalidate window that used to be emitted
+  // here served pre-edit content for hours after an editor saved — Vercel
+  // provides no way to purge edge-cached function responses, so the purge
+  // webhook (which targets the CONSUMER site's CDN) could not help. Live
+  // updates now come from: app-level Redis cache (invalidated on every
+  // write) for origin speed + ETag/304 for cheap browser revalidation.
+  headers['Cache-Control'] = 'public, max-age=0, must-revalidate'
+  headers['CDN-Cache-Control'] = 'no-store'
+  headers['Vercel-CDN-Cache-Control'] = 'no-store'
 
   return headers
 }
@@ -540,6 +546,19 @@ if (updatedPage.isPublished) {
 | `app/api/projects/[projectId]/collections/[collectionId]/items/[itemId]/route.ts` | PUT, DELETE, POST | published / deleted | `pathsForCollectionItemUpdate` |
 | `app/api/projects/[projectId]/global-elements/[elementId]/route.ts` | PUT | global.updated | `pathsForGlobalElementUpdate` |
 | `app/api/projects/[projectId]/seo/route.ts` | PUT | global.updated | `pathsForSeoUpdate` |
+| `app/api/projects/[projectId]/pages/route.ts` | POST (published) | published | `pathsForPageUpdate` |
+| `app/api/projects/[projectId]/pages/reorder/route.ts` | POST | global.updated | `pathsForGlobalElementUpdate` |
+| `app/api/projects/[projectId]/pages/[pageId]/elements/route.ts` | POST | published | `pathsForPageUpdate` |
+| `app/api/projects/[projectId]/pages/[pageId]/elements/[elementId]/route.ts` | PATCH, DELETE, POST (duplicate) | published / deleted | `pathsForPageUpdate` |
+| `app/api/projects/[projectId]/pages/[pageId]/elements/reorder/route.ts` | PATCH | published | `pathsForPageUpdate` |
+| `app/api/projects/[projectId]/blog/route.ts` | POST (published) | published | `pathsForBlogUpdate` |
+| `app/api/projects/[projectId]/collections/[collectionId]/items/reorder/route.ts` | POST | published | `pathsForCollectionItemUpdate` |
+| `app/api/projects/[projectId]/content/route.ts` | POST | published | `pathsForPageUpdate` |
+| `app/api/content/[contentId]/route.ts` | PATCH, DELETE | published / deleted | `pathsForPageUpdate` |
+| `app/api/projects/[projectId]/global-elements/route.ts` | POST (active) | global.updated | `pathsForGlobalElementUpdate` |
+
+> Element edits, content-block edits, and reorders only fire when they affect
+> public output (the page is published / the global element is active).
 
 ---
 
@@ -682,10 +701,13 @@ This is a **backward-compatible additive change** for any project that has not
 configured a webhook URL:
 
 - Existing projects get `cdnSettings = {}` on rollout.
-- With empty settings: `Cache-Control` now emits `s-maxage=21600,
-  stale-while-revalidate=604800` for the medium tier (was `no-store`). Sites
-  start benefiting from CDN caching immediately. Worst-case staleness: 6h for
-  most content, 24h for global elements.
+- ~~With empty settings: `Cache-Control` now emits `s-maxage=21600, …`~~
+  **Superseded (2026-06-11):** edge-caching the CMS API broke live updates
+  (no purge path for Vercel function responses — editors' saves took up to
+  6h to appear). API responses are now `no-store` at the CDN; origin speed
+  comes from the app-level Redis cache with write-through invalidation.
+  The purge-webhook design below still applies to the CONSUMER site's own
+  CDN/pages, which the webhook can purge.
 - Sites that *need* zero-cache behavior set `cdnSettings.disableCdnCache = true`.
 
 **Existing consumer sites do not need any code change to benefit from Part 1**
