@@ -82,7 +82,23 @@ interface ImportMeta {
 
 ## 3. SDK Initialisation — `src/App.tsx`
 
-Initialise the SDK **once**, after React has mounted. The module-level `sdkInitialised` flag prevents React StrictMode's double-invoke of `useEffect` from calling `init()` twice.
+Initialise the SDK **once**, after React has mounted. The module-level `sdkInitialised` flag ensures `window.SpaceBlock.init()` is called exactly once across React StrictMode's mount → unmount → mount cycle.
+
+> ⚠️ **StrictMode trap — must read.** The obvious pattern (early-return on a
+> module guard at the top of the effect, a `setTimeout` poll for
+> `window.SpaceBlock`, and `return () => clearTimeout(timeoutId)`) **silently
+> breaks** in dev StrictMode. Mount 1 runs, the SDK script hasn't loaded yet, so
+> it schedules the poll; the cleanup clears that timeout; mount 2 hits the
+> guard and returns — so the poll never restarts. When the SDK then loads
+> (~500 ms on a cold load), **`init()` is never called**. The SDK never enters
+> editor mode, never registers its Visual-Editor listeners, and **template
+> detection silently never runs** — your templates won't appear in the editor.
+> It only "works" when the SDK happens to be warm in cache and already present
+> on mount 1's first synchronous check.
+>
+> The fix below uses a **per-effect-run `cancelled` flag** so each StrictMode
+> mount runs its own poll, and gates the one-time `init()` with the module flag
+> *inside* the poll (never as an early `return` that skips scheduling).
 
 ```tsx
 // src/App.tsx
@@ -90,18 +106,28 @@ import { useEffect } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { Layout } from '@/components/layout'
 
-// Survives React StrictMode double-invoke
+// Guards against calling SpaceBlock.init() more than once. Module-level so it
+// survives StrictMode's mount → unmount → mount cycle.
 let sdkInitialised = false
 
 export default function App() {
   useEffect(() => {
-    if (sdkInitialised) return
-    sdkInitialised = true
-
+    // Per-run flag: StrictMode's cleanup only stops THIS run's poll, so the
+    // second mount starts a fresh poll. The module-level `sdkInitialised` flag
+    // still guarantees init() runs exactly once.
+    let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout>
 
-    function init() {
-      if (window.SpaceBlock) {
+    function tryInit() {
+      if (cancelled) return
+
+      if (!window.SpaceBlock) {
+        timeoutId = setTimeout(tryInit, 50) // SDK script not ready yet — poll.
+        return
+      }
+
+      if (!sdkInitialised) {
+        sdkInitialised = true
         window.SpaceBlock.init({
           apiKey: import.meta.env.VITE_SPACEBLOCK_API_KEY as string,
           projectId: import.meta.env.VITE_SPACEBLOCK_PROJECT_ID as string,
@@ -114,19 +140,17 @@ export default function App() {
         // Wait two animation frames for React to finish rendering, then load
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            timeoutId = setTimeout(() => {
-              window.SpaceBlock?.load()
-            }, 200)
+            setTimeout(() => window.SpaceBlock?.load(), 200)
           })
         })
-      } else {
-        // SDK not yet loaded — poll every 50 ms
-        timeoutId = setTimeout(init, 50)
       }
     }
 
-    init()
-    return () => clearTimeout(timeoutId)
+    tryInit()
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
   }, [])
 
   return (

@@ -70,16 +70,25 @@ index.html              ← SDK script loader
 The SDK must come from the same origin as the CMS so the editor's iframe messaging works. Vite substitutes `%VITE_SPACEBLOCK_API_BASE%` from `.env` at both dev and build time. **Don't branch the SDK URL on `window.location.hostname`** — your dev server is on localhost, but the CMS is wherever `VITE_SPACEBLOCK_API_BASE` points.
 
 ```tsx
-// src/App.tsx — initialise once React has mounted
+// src/App.tsx — initialise once React has mounted.
+// StrictMode-safe: see 01-setup.md §3 for why the per-run `cancelled` flag and
+// the in-poll `sdkInitialised` guard matter (clearing the poll in cleanup +
+// an early-return guard strands init() and template detection never runs).
 let sdkInitialised = false
 
 export default function App() {
   useEffect(() => {
-    if (sdkInitialised) return
-    sdkInitialised = true
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout>
 
-    function init() {
-      if (window.SpaceBlock) {
+    function tryInit() {
+      if (cancelled) return
+      if (!window.SpaceBlock) {
+        timeoutId = setTimeout(tryInit, 50)
+        return
+      }
+      if (!sdkInitialised) {
+        sdkInitialised = true
         window.SpaceBlock.init({
           apiKey: import.meta.env.VITE_SPACEBLOCK_API_KEY,
           projectId: import.meta.env.VITE_SPACEBLOCK_PROJECT_ID,
@@ -90,11 +99,10 @@ export default function App() {
         requestAnimationFrame(() => requestAnimationFrame(() =>
           setTimeout(() => window.SpaceBlock?.load(), 200)
         ))
-      } else {
-        setTimeout(init, 50)
       }
     }
-    init()
+    tryInit()
+    return () => { cancelled = true; clearTimeout(timeoutId) }
   }, [])
 
   return (

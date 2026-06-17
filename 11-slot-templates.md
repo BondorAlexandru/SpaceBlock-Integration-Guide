@@ -287,20 +287,38 @@ Clicking **Save** persists the emptied values. The slot stays gone after reload 
 
 ### Detection threshold
 
-The grouped UI activates when the element's schema contains **`project-N-*` fields across two or more distinct slot numbers**. Any template that follows this naming convention will automatically get the drag-and-drop accordion — you do not need to configure anything extra.
+The grouped drag-and-drop accordion activates when the element's schema contains **`project-N-*` fields across two or more distinct slot numbers**.
+
+> ⚠️ **The drag-reorder accordion is hard-wired to the literal `project` prefix.**
+> The Visual Editor detects the slot group by matching `project-N-…` (and uses
+> `project-N-client` as the row label and `project-N-image` as the thumbnail).
+> A differently-named prefix (`member-N-`, `item-N-`, `testimonial-N-`) does
+> **not** get the drag accordion — those fall back to the generic
+> **count stepper** (numbered fields beyond the current count are hidden;
+> default 3). The component still renders and the data model is identical, but
+> editors add/remove via a count control rather than drag-to-reorder.
+>
+> **So: if you want the drag-and-drop reorder UI, name your slot fields
+> `project-N-*` regardless of domain** (e.g. a team grid still uses
+> `project-N-client` for the person's name, `project-N-image` for the photo).
+> Multiple slot templates on one page can each use `project-N-*` independently —
+> detection is scoped per element (`${elementId}-project-N-…`).
 
 ## Adapting the Pattern
 
-The same approach works for any numbered list of items. Change the prefix to match your domain:
+Keep the **`project-N-`** prefix to get the drag accordion; only the *meaning*
+of each field changes per domain:
 
-| Use case | Prefix | Order field |
-|----------|--------|-------------|
-| Project showcase | `project-N-` | `project-N-order` |
-| Team members | `member-N-` | `member-N-order` |
-| Testimonials | `testimonial-N-` | `testimonial-N-order` |
-| FAQ items | `question-N-` | `question-N-order` |
+| Use case | Slot prefix (for drag UI) | Label field | Order field |
+|----------|---------------------------|-------------|-------------|
+| Project showcase | `project-N-` | `project-N-client` | `project-N-order` |
+| Team members | `project-N-` | `project-N-client` (= name) | `project-N-order` |
+| Testimonials | `project-N-` | `project-N-client` (= author) | `project-N-order` |
+| FAQ items | `project-N-` | `project-N-client` (= question) | `project-N-order` |
 
-The Visual Editor groups any schema that has `project-N-*`-style fields — as long as the prefix before the number is `project`. For other prefixes use the same structure; the CMS uses the `client`-equivalent field (the first text field in the slot) as the row label in the drag list.
+If you deliberately use a non-`project` prefix, expect the count-stepper UI
+instead of drag-to-reorder — both persist the same `${elementId}-<prefix>-N-*`
+content keys, so your render component doesn't change.
 
 ## Checklist
 
