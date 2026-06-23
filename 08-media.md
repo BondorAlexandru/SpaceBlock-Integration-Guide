@@ -232,6 +232,52 @@ storage-zone/
 - Bunny API key may be expired
 - Storage zone permissions may be misconfigured
 
+## Image Transforms (resizing & optimization)
+
+Images are served through the Bunny CDN, whose Optimizer resizes/optimizes on
+the fly from query-string params — no need to upload multiple copies. Request a
+size by appending params to a media `cdnUrl`:
+
+| Param          | Example              | Meaning                           |
+| -------------- | -------------------- | --------------------------------- |
+| `width`        | `?width=800`         | Resize to width (px)              |
+| `height`       | `?height=600`        | Resize to height (px)             |
+| `aspect_ratio` | `?aspect_ratio=16:9` | Crop to ratio                     |
+| `quality`      | `?quality=80`        | Compression quality (1–100)       |
+| `format`       | `?format=webp`       | Output format (`webp`, `avif`, …) |
+
+```html
+<!-- responsive srcset -->
+<img
+  src="https://your-zone.b-cdn.net/photo.jpg?width=960"
+  srcset="https://your-zone.b-cdn.net/photo.jpg?width=480 480w,
+          https://your-zone.b-cdn.net/photo.jpg?width=960 960w,
+          https://your-zone.b-cdn.net/photo.jpg?width=1920 1920w"
+  sizes="(max-width: 768px) 100vw, 960px"
+  alt="…"
+/>
+```
+
+> If the Optimizer isn't enabled on your pull zone, Bunny serves the original
+> image and ignores the params — so it's always safe to add them.
+
+## Focal Point (smart cropping)
+
+Each image can have a **focal point** — the spot that must stay in frame when
+the image is cropped (e.g. into a `16:9` hero). Set it when you **pick an
+image**: in the media picker, select an image and click **"Edit image"**, then
+click the part that matters (a marker shows the chosen point) and Save. The
+focal point is stored on the asset, so it applies everywhere that image is used.
+
+It's stored on the media record as `focalX` / `focalY` (fractions `0..1`, where
+`0,0` is top-left and `1,1` is bottom-right). To honor it on your site, apply it
+as `object-position` on a cropped image:
+
+```js
+// focalX=0.3, focalY=0.2  ->  "30% 20%"
+const objectPosition = `${(media.focalX ?? 0.5) * 100}% ${(media.focalY ?? 0.5) * 100}%`
+```
+
 ## Next Steps
 
 - [API Reference](./09-api-reference.md) - Complete API documentation
