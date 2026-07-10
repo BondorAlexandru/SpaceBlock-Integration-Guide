@@ -47,6 +47,8 @@ index.html              ← SDK script loader
 11. [Slot-Based Templates](./11-slot-templates.md) — Numbered slot components with drag-and-drop ordering
 12. [SEO & Social Metadata](./12-seo-metadata.md) — Per-page SEO and Open Graph tags
 13. [Editor-Only DOM](./13-editor-only-dom.md) — Gate hidden CMS field markers so public visitors don't fetch them
+14. [CDN Cache Invalidation](./14-cdn-cache-invalidation.md) — Sub-second content updates via signed purge webhooks
+15. [Component Builder](./15-components.md) — Build/import reusable components (incl. from Figma) that the SDK mounts on your site
 
 ## Quick Start
 

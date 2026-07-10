@@ -261,6 +261,9 @@ size by appending params to a media `cdnUrl`:
 > If the Optimizer isn't enabled on your pull zone, Bunny serves the original
 > image and ignores the params — so it's always safe to add them.
 
+Inside the CMS, `lib/media/transform.ts` provides `transformImageUrl(url, opts)`
+and `buildSrcSet(url, widths)` helpers.
+
 ## Focal Point (smart cropping)
 
 Each image can have a **focal point** — the spot that must stay in frame when
@@ -277,6 +280,9 @@ as `object-position` on a cropped image:
 // focalX=0.3, focalY=0.2  ->  "30% 20%"
 const objectPosition = `${(media.focalX ?? 0.5) * 100}% ${(media.focalY ?? 0.5) * 100}%`
 ```
+
+The helper `focalToObjectPosition(focalX, focalY)` (in `lib/media/transform.ts`)
+produces this string and defaults to `50% 50%` when unset.
 
 ## Next Steps
 
