@@ -54,6 +54,58 @@ Each tag value is resolved through a fallback chain (first non-empty wins):
 - **type** → `seo.type` → `article` for posts, `website` for pages
 - **noindex** → `seo.noindex === true`
 
+> **Note:** the *render endpoint* (§3) resolves this fallback chain server-side.
+> The raw JSON API endpoints do **not** — see the flat fields below.
+
+### Flat SEO fields on the JSON API
+
+For convenience, the public JSON endpoints also expose the SEO overrides as
+**flat, top-level fields** alongside the existing data — additively, so every
+existing field (including the nested `seo` object) is unchanged and consumers
+that ignore them keep working:
+
+| Field | Type | Source |
+|-------|------|--------|
+| `seoTitle` | `string \| null` | `seo.title` |
+| `seoDescription` | `string \| null` | `seo.description` |
+| `ogImage` | `string \| null` | `seo.image` (absolute URL) |
+| `canonicalUrl` | `string \| null` | `seo.canonical` |
+| `noindex` | `boolean` | `seo.noindex` (defaults `false`) |
+| `updatedAt` | `string` | ISO 8601 last-modified |
+
+They appear on:
+
+- `GET /api/public/pages/{projectId}/list` — each page (flat fields + `updatedAt`; the list has **no** nested `seo` object)
+- `GET /api/public/pages/{projectId}/{slug}` — the `page` object (flat fields + the nested `seo`)
+- `GET /api/public/blog?apiKey={key}` — each post in `posts[]`
+- `GET /api/public/blog/{slug}?apiKey={key}` — the `post` object
+
+**The server does not apply fallbacks here** — it returns the raw author
+override or `null` (`false` for `noindex`). Unlike the render endpoint, the flat
+JSON fields never fall back to the title / excerpt / featuredImage / project
+defaults. **You own the fallback chain**, for example:
+
+```ts
+const title       = page.seoTitle       ?? page.name          ?? SITE_NAME
+const description = post.seoDescription ?? post.excerpt        ?? DEFAULT_DESCRIPTION
+const ogImage     = post.ogImage        ?? post.featuredImage  ?? DEFAULT_OG_IMAGE
+const canonical   = page.canonicalUrl   ?? new URL(page.path, SITE_URL).toString()
+```
+
+The nested `seo` object still exists on the page/blog **detail** endpoints for
+backwards compatibility; the flat fields are a mirror of it. To build a
+`sitemap.xml`, use `GET /api/public/pages/{projectId}/sitemap`, which returns
+`{ entries: [{ type, path, slug, updatedAt, noindex }] }` for all published
+pages and posts (JSON — you render the XML against your own origin).
+
+### Caching / propagation
+
+Public JSON responses are **not edge-cached**: they carry
+`CDN-Cache-Control: no-store` plus `Cache-Control: public, max-age=0,
+must-revalidate` and an `ETag`. The origin app-cache is invalidated on
+publish/save, so SEO edits go live on the next request (effectively immediate) —
+there's no CDN TTL to wait out.
+
 ## 2. Authoring SEO
 
 There are three places to set SEO, mirroring the fallback chain:

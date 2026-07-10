@@ -38,6 +38,15 @@ interface BlogPost {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Flat SEO fields — convenience mirror of the nested `seo` object below.
+  // Each holds the raw author override or null; the server applies NO fallback.
+  seoTitle: string | null;        // from seo.title
+  seoDescription: string | null;  // from seo.description
+  ogImage: string | null;         // from seo.image (absolute URL, 1200x630)
+  canonicalUrl: string | null;    // from seo.canonical
+  noindex: boolean;               // from seo.noindex; defaults to false
+
   seo?: {
     title: string | null;
     description: string | null;
@@ -49,8 +58,17 @@ interface BlogPost {
 }
 ```
 
-The optional `seo` object powers social-share link previews (Open Graph /
-Twitter cards). See [SEO & Social Metadata](./12-seo-metadata.md).
+The flat `seoTitle` / `seoDescription` / `ogImage` / `canonicalUrl` / `noindex`
+fields are exposed additively on both the list (`GET /api/public/blog`) and
+single-post (`GET /api/public/blog/{slug}`) endpoints — every existing field is
+unchanged, so consumers that ignore them keep working. They are a convenience
+mirror of the nested `seo` object, and the server returns the raw override or
+`null` (it applies **no** fallback). Own your fallback chain, e.g.
+`post.seoTitle ?? post.title`, `post.seoDescription ?? post.excerpt`,
+`post.ogImage ?? post.featuredImage`. The nested `seo` object still powers
+social-share link previews (Open Graph / Twitter cards) and remains on the
+single-post endpoint for backwards compatibility. See
+[SEO & Social Metadata](./12-seo-metadata.md).
 
 ## Content Block Types
 

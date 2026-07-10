@@ -195,6 +195,11 @@ GET /api/public/blog
       "tags": ["tutorial", "getting-started"],
       "publishedAt": "2024-01-15T10:30:00Z",
       "updatedAt": "2024-01-15T10:30:00Z",
+      "seoTitle": "Getting Started with SpaceBlock",
+      "seoDescription": "A step-by-step guide to integrating SpaceBlock into your site.",
+      "ogImage": "https://cdn.example.com/og/getting-started.png",
+      "canonicalUrl": "https://mysite.com/blog/getting-started",
+      "noindex": false,
       "seo": {
         "title": "Getting Started with SpaceBlock",
         "description": "A step-by-step guide to integrating SpaceBlock into your site.",
@@ -209,6 +214,12 @@ GET /api/public/blog
   "hasMore": true
 }
 ```
+
+The flat `seoTitle`, `seoDescription`, `ogImage`, `canonicalUrl`, and `noindex`
+fields are additive convenience mirrors of the nested `seo` object; the server
+returns the raw override or `null` / `false` (no server-side fallback). See
+[SEO & Social Metadata](./12-seo-metadata.md) for the recommended consumer
+fallback chain.
 
 **Example:**
 
@@ -261,6 +272,12 @@ GET /api/public/blog/{slug}
     },
     "tags": ["tutorial"],
     "publishedAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z",
+    "seoTitle": "Getting Started with SpaceBlock",
+    "seoDescription": "A step-by-step guide to integrating SpaceBlock into your site.",
+    "ogImage": "https://cdn.example.com/og/getting-started.png",
+    "canonicalUrl": "https://mysite.com/blog/getting-started",
+    "noindex": false,
     "seo": {
       "title": "Getting Started with SpaceBlock",
       "description": "A step-by-step guide to integrating SpaceBlock into your site.",
@@ -405,14 +422,12 @@ GET /api/public/pages/{projectId}/list
       "title": "Welcome - My Site",
       "description": "Homepage meta description",
       "createdAt": "2024-01-15T10:30:00Z",
-      "seo": {
-        "title": "Welcome - My Site",
-        "description": "The official home of My Site.",
-        "image": "https://cdn.example.com/og/home.png",
-        "canonical": "https://mysite.com/",
-        "type": "website",
-        "noindex": false
-      }
+      "updatedAt": "2024-01-16T09:00:00Z",
+      "seoTitle": "Welcome - My Site",
+      "seoDescription": "The official home of My Site.",
+      "ogImage": "https://cdn.example.com/og/home.png",
+      "canonicalUrl": "https://mysite.com/",
+      "noindex": false
     },
     {
       "id": "page-456",
@@ -421,11 +436,23 @@ GET /api/public/pages/{projectId}/list
       "path": "/about",
       "title": "About Us - My Site",
       "description": "Learn about our company",
-      "createdAt": "2024-01-15T10:30:00Z"
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "seoTitle": null,
+      "seoDescription": null,
+      "ogImage": null,
+      "canonicalUrl": null,
+      "noindex": false
     }
   ]
 }
 ```
+
+Each page in the list carries the flat `seoTitle`, `seoDescription`, `ogImage`,
+`canonicalUrl`, `noindex`, and `updatedAt` fields (additive; all existing fields
+unchanged). The list does **not** include the nested `seo` object — use the
+detail endpoint below for that. Flat fields return the raw override or
+`null` / `false`; the server applies no fallback.
 
 #### Get Page with Elements
 
@@ -457,6 +484,12 @@ Preview responses bypass the cache and are returned with no-cache headers.
     "path": "/",
     "title": "Welcome - My Site",
     "description": "Homepage meta description",
+    "updatedAt": "2024-01-16T09:00:00Z",
+    "seoTitle": "Welcome - My Site",
+    "seoDescription": "The official home of My Site.",
+    "ogImage": "https://cdn.example.com/og/home.png",
+    "canonicalUrl": "https://mysite.com/",
+    "noindex": false,
     "seo": {
       "title": "Welcome - My Site",
       "description": "The official home of My Site.",
@@ -507,6 +540,37 @@ GET /api/public/render/{projectId}               → home page (empty slug)
 
 See [SEO & Social Metadata](./12-seo-metadata.md) for the full guide, the exact
 tag block, fallback rules, and host-rewrite setup.
+
+#### Sitemap
+
+Returns a flat list of every published page and blog post so you can render your
+own `sitemap.xml`. It's a convenience bundle of the two list endpoints.
+
+```
+GET /api/public/pages/{projectId}/sitemap
+```
+
+Returns **JSON, not XML**: the CMS doesn't know your site's absolute origin, so
+the consumer joins each `path` to its own origin and renders the XML.
+
+**Response:**
+
+```json
+{
+  "entries": [
+    { "type": "page", "path": "/", "slug": "home", "updatedAt": "2024-01-16T09:00:00Z", "noindex": false },
+    { "type": "blog", "path": "/blog/getting-started", "slug": "getting-started", "updatedAt": "2024-01-15T10:30:00Z", "noindex": false }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| type | `"page"` \| `"blog"` | Whether the entry is a page or a blog post |
+| path | string | Path relative to your site origin |
+| slug | string | The page/post slug |
+| updatedAt | string | ISO 8601 last-modified timestamp (use for `<lastmod>`) |
+| noindex | boolean | `true` → exclude from the sitemap / mark noindex |
 
 ---
 

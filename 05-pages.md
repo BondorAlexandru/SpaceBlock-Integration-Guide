@@ -51,7 +51,7 @@ Response shape:
 
 Note that image fields can come back as either a plain string or `{ url, text }` — the `findImage` helper handles both.
 
-The `page` object also includes an optional `seo` object (title, description, image, canonical, type, noindex) that powers social-share previews. See [SEO & Social Metadata](./12-seo-metadata.md).
+The `page` object also includes an optional `seo` object (title, description, image, canonical, type, noindex) that powers social-share previews. Alongside it, the API exposes **flat SEO fields** — `seoTitle`, `seoDescription`, `ogImage`, `canonicalUrl`, `noindex` — plus `updatedAt` (an ISO 8601 timestamp). These are purely additive; every existing field is unchanged. Each flat field returns the raw override or `null` with **no** server-side fallback, so own your fallback chain (e.g. `page.seoTitle ?? page.name`). The page **list** endpoint (`/api/public/pages/{projectId}/list`) exposes the flat fields + `updatedAt` too, but not the nested `seo` object. See [SEO & Social Metadata](./12-seo-metadata.md).
 
 ## Cache-busting and `cache: 'no-store'`
 
