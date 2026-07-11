@@ -21,6 +21,57 @@ Paste this once, just before `</body>` on your site (every page):
 Copy the exact snippet (with both values filled in) from **Chatbot → Preview →
 Add to your site**.
 
+## Modes: corner vs. full-page
+
+Two presentations, chosen by the theme's **Position / mode** setting (Chatbot →
+Preview) or overridden per embed:
+
+- **Corner** — a floating launcher + panel (the default).
+- **Full page** — a page-like takeover (own header + "GO BACK", centred column,
+  large composer). The widget **never** opens full-page automatically — put it on
+  a dedicated route and open it there (below).
+
+Embed attributes:
+
+| Attribute | Effect |
+| --- | --- |
+| `data-mode="fullscreen"` \| `"corner"` | Override the theme's default mode for this embed. |
+| `data-launcher="false"` | Hide the floating launcher — the chat is then opened only via the JS API. |
+
+### JS API
+
+Once loaded (published chatbot), the widget exposes:
+
+```js
+window.SpaceBlockChatbot.open('fullscreen' | 'corner')  // open (defaults to the configured mode)
+window.SpaceBlockChatbot.close()
+window.SpaceBlockChatbot.toggle('fullscreen' | 'corner')
+```
+
+The global is set asynchronously (after the config request resolves), so poll a
+few times if you call it very early.
+
+### Full-page chat as its own route (recommended)
+
+Install the widget site-wide with `data-launcher="false"`, then add a dedicated
+route (e.g. `/chat`) that opens the full-page chat on mount and closes it on
+unmount. The chat's **"← GO BACK"** navigates back and closes it.
+
+```jsx
+// /chat page (React example)
+useEffect(() => {
+  let n = 0
+  const go = () => window.SpaceBlockChatbot
+    ? window.SpaceBlockChatbot.open('fullscreen')
+    : n++ < 40 && setTimeout(go, 100)
+  go()
+  return () => window.SpaceBlockChatbot?.close()
+}, [])
+```
+
+Link to it from your nav (`<a href="/chat">Chat</a>`). This keeps the rest of the
+site usable — the full-page chat only appears on that route.
+
 ## Behaviour
 
 - The script is self-contained: no dependencies, and it renders inside a **Shadow

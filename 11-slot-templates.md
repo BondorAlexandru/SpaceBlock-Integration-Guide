@@ -251,7 +251,7 @@ function renderElement(element: PageElement) {
 
 ## Visual Editor Behaviour
 
-When the editor opens a Showcase element the Visual Editor automatically detects the `project-N-*` grouping pattern and switches to a special UI:
+When the editor opens a Showcase element the Visual Editor automatically detects its `project-N-*` slot family (or any `<prefix>-N-*` family with a `<prefix>-N-order` field — see [Detection threshold](#detection-threshold)) and switches to a special UI:
 
 ### Projects accordion
 
@@ -261,7 +261,7 @@ All populated slots are collapsed into a labelled, draggable list. Each row show
 - A **chevron** to expand the slot's individual fields
 - A **delete** control (trash icon) — empties the slot (see [Deleting a slot](#deleting-a-slot))
 
-Expanding a slot shows its image (with Library picker), client, tags, URL, and variant fields — editable inline without leaving the panel.
+Expanding a slot shows its fields — image (with Library picker), text, URL, select, and **rich-text** — editable inline without leaving the panel.
 
 ### Drag-and-drop ordering
 
@@ -276,49 +276,35 @@ Clicking **Save** persists the new order values to the database. On next page lo
 
 Each accordion row has a delete (trash) control. The row maps to a **stable slot index `N`**, not its display position. Deleting it:
 
-1. **Clears every field of slot `N`** — `image`, `client`, `tags`, `url`, `order`, `variant` are all set to empty. The element itself and the slot's schema keys are **not** removed: slot `N` stays defined so it remains reusable by **Add project** and the `project-N-*` pattern still detects (it needs ≥2 slot numbers present).
+1. **Clears every field of slot `N`** — `image`, `client`, `tags`, `url`, `order`, `variant` are all set to empty. The element itself and the slot's schema keys are **not** removed: slot `N` stays defined so it remains reusable by the **Add** button, and the accordion still detects the family via its `<prefix>-N-order` field.
 2. **Emits one `CMS_UPDATE` postMessage per cleared field** — `{ type: 'CMS_UPDATE', cmsId: '{elementId}-project-{N}-{field}', content: '' }`. One message per field (the preview keys updates by `cmsId`; a single bulk message will not work). The live preview drops the card instantly with **no full reload**.
 3. Does **not** send `CMS_REFRESH_AFTER_DELETE` — that event is reserved for whole-section deletion and would tear down the entire Showcase.
 4. Does **not** renumber other slots. Their content and `order` are untouched. (Display order may optionally be compacted by writing fresh `project-M-order` integers, but it isn't required — the component skips empty slots and sorts by `order ?? slot`.)
 
 Clicking **Save** persists the emptied values. The slot stays gone after reload because the component hides any slot where **both `image` and `client` are empty** — the `populated.filter(p => p.image || p.client)` rule shown in the [Showcase Component](#showcase-component). That same filter is why the now-empty slot can be repopulated later by **Add project**.
 
-> The **Add project** affordance stays available even when zero slots are populated, so a fully cleared Showcase can be rebuilt from scratch.
+> The **Add** affordance (labelled per family — "Add project", "Add card", …) stays available even when zero slots are populated, so a fully cleared list can be rebuilt from scratch.
 
 ### Detection threshold
 
-The grouped drag-and-drop accordion activates when the element's schema contains **`project-N-*` fields across two or more distinct slot numbers**.
-
-> ⚠️ **The drag-reorder accordion is hard-wired to the literal `project` prefix.**
-> The Visual Editor detects the slot group by matching `project-N-…` (and uses
-> `project-N-client` as the row label and `project-N-image` as the thumbnail).
-> A differently-named prefix (`member-N-`, `item-N-`, `testimonial-N-`) does
-> **not** get the drag accordion — those fall back to the generic
-> **count stepper** (numbered fields beyond the current count are hidden;
-> default 3). The component still renders and the data model is identical, but
-> editors add/remove via a count control rather than drag-to-reorder.
->
-> **So: if you want the drag-and-drop reorder UI, name your slot fields
-> `project-N-*` regardless of domain** (e.g. a team grid still uses
-> `project-N-client` for the person's name, `project-N-image` for the photo).
-> Multiple slot templates on one page can each use `project-N-*` independently —
-> detection is scoped per element (`${elementId}-project-N-…`).
+The grouped accordion activates for **any** slot family `<prefix>-N-*` whose schema includes a **`<prefix>-N-order`** field. The `-order` field is the opt-in signal: numbered fields *without* one (e.g. `col-N-text`) stay a flat "Number of X" list instead. A single block may declare **several** such families — each renders as its own independent accordion (e.g. a `media-N-*` list and a `card-N-*` list side by side). You do not need to configure anything extra.
 
 ## Adapting the Pattern
 
-Keep the **`project-N-`** prefix to get the drag accordion; only the *meaning*
-of each field changes per domain:
+The same approach works for any numbered list of items. Change the prefix to match your domain:
 
-| Use case | Slot prefix (for drag UI) | Label field | Order field |
-|----------|---------------------------|-------------|-------------|
-| Project showcase | `project-N-` | `project-N-client` | `project-N-order` |
-| Team members | `project-N-` | `project-N-client` (= name) | `project-N-order` |
-| Testimonials | `project-N-` | `project-N-client` (= author) | `project-N-order` |
-| FAQ items | `project-N-` | `project-N-client` (= question) | `project-N-order` |
+| Use case | Prefix | Order field |
+|----------|--------|-------------|
+| Project showcase | `project-N-` | `project-N-order` |
+| Team members | `member-N-` | `member-N-order` |
+| Testimonials | `testimonial-N-` | `testimonial-N-order` |
+| FAQ items | `question-N-` | `question-N-order` |
 
-If you deliberately use a non-`project` prefix, expect the count-stepper UI
-instead of drag-to-reorder — both persist the same `${elementId}-<prefix>-N-*`
-content keys, so your render component doesn't change.
+The Visual Editor groups any schema whose fields follow `<prefix>-N-*` **and include a `<prefix>-N-order` field** — the prefix is no longer restricted to `project`. Each qualifying prefix becomes its **own** draggable accordion, so one block can have several at once (e.g. `media-N-*` and `card-N-*`).
+
+**Naming.** A group is labelled after its prefix — `project` → "Projects", `media` → "Media", `card` → "Cards", `member` → "Members" (curated), and any other prefix is Capitalised (`gallery` → "Gallery"). Choosing the prefix is how you name/rename a list.
+
+**Row label.** Each draggable row is titled by the slot's first text-like sub-field, tried in order: `client`, `title`, `caption`, `name`, `label`, `heading` — falling back to "<Group> N" when none exists. Give every slot one of these so rows are identifiable.
 
 ## Checklist
 
