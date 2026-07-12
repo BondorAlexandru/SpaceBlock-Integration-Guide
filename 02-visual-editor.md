@@ -207,6 +207,28 @@ useEffect(() => {
 | `CMS_INSERT_ELEMENT` | New page element inserted | `{ elementId }` |
 | `CMS_REFRESH_AFTER_DELETE` | Element deleted from page | - |
 | `CMS_UPDATE` | Content block updated | `{ cmsId, content, contentType }` |
+| `CMS_CAPTURE_ELEMENT` | Editor requests a screenshot of an element for its template preview image | `{ elementId, cmsId? }` |
+
+### Template Preview Capture
+
+The Add Element dialog's **Refresh from site / Capture from site** buttons send
+`CMS_CAPTURE_ELEMENT { elementId }` to the preview iframe. **The SpaceBlock SDK
+handles this automatically** — no integration work is needed beyond loading
+`spaceblock-sdk.js`. The SDK finds the element (`[data-cms-element-id]`, falling
+back to `[data-cms-id]`), rasterizes it (computed styles inlined into an SVG
+`foreignObject`; `<img>`/background images embedded as data URLs), and replies:
+
+- `CMS_ELEMENT_CAPTURED { elementId, cmsId, dataUrl }` — a WebP data URL of the element as currently rendered
+- `CMS_ELEMENT_CAPTURE_FAILED { elementId, cmsId, error }` — element missing or rasterization failed
+
+Notes for accurate captures:
+
+1. Images inside the element must be same-origin or served with CORS headers
+   (the SpaceBlock media CDN qualifies) — otherwise they're skipped in the shot.
+2. Web fonts fall back to system fonts inside the capture (SVG-in-`<img>`
+   documents can't fetch external fonts) — layout is preserved.
+3. Sites running an older cached SDK won't answer; the editor times out after
+   12s with a hint to refresh the preview.
 
 ### Why This Matters
 

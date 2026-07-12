@@ -219,7 +219,7 @@ storage-zone/
 
 - Check Bunny.net credentials in Project Settings
 - Verify storage zone exists and API key is correct
-- Check file size limits (default: 10MB)
+- Check file size limits (default: 50MB)
 
 ### Images Not Loading
 
