@@ -206,6 +206,33 @@ function renderElement(element: PageElement) {
 - **`findValue(content, suffix)`** — locates a field by suffix and unwraps `{ url, text }` objects.
 - **`findImage(content, ...suffixes)`** — tries multiple suffixes in order and unwraps `{ url }` objects. Use it for any image field; the CMS sometimes returns plain strings, sometimes `{ url }`.
 
+## Links & Buttons — never hardcode a destination
+
+**Every link a visitor can click must be an editable `url` field. Do not hardcode `href`/`to` for content links.** A `url` field stores **both** the destination and the label in one `{ url, text }` object, so the editor exposes a single URL editor for the button — no separate label/url split, no orphaned fields.
+
+Three parts have to agree on the **same bare suffix** (e.g. `primary`):
+
+1. **Registry** (`Layout.tsx`) — declare it `type="url"`:
+   ```tsx
+   <span data-cms-id="primary" data-cms-type="url" />
+   ```
+2. **Renderer** — read it with `findLink` (unwraps `{ url, text }`) and render a `CmsButton`:
+   ```tsx
+   const primary = findLink(content, 'primary')
+   <CmsButton id={fid('primary')} url={primary.url} label={primary.text}
+              fallbackUrl="/menu" fallbackLabel="View the menu" />
+   ```
+3. **`findLink(content, suffix)`** (in `DynamicPage.tsx`) — returns `{ url, text }` for an object field, or `{ url: string }` for a bare string.
+
+`CmsButton` (in `sections/_cms.tsx`) is the single source of truth for rendering a link field. It:
+- emits `data-cms-id` + `data-cms-type="url"` so the field is **editable in place**;
+- renders a **plain `<a href>`, never react-router `<Link>`** — the SDK intercepts `<a>` clicks to open the URL editor, whereas a `<Link>` navigates away instead. (Full-page loads on internal links are fine given the SPA fallback in `public/_redirects`.)
+- **validates the stored value**: only a string starting with a scheme, `/` or `#` is used; anything else (e.g. a label that leaked into the URL field) falls back to `fallbackUrl`. An empty label falls back to `fallbackLabel`.
+
+The `fallbackUrl`/`fallbackLabel` are **safety nets for empty/bad data, not the real link** — the real link always comes from the editable field.
+
+> ⚠️ **Legacy-data gotcha.** The dashboard types each field from the element's **stored** value, not the live registry. If an element was first saved when the field was `text` (label only) or a split `*-label`/`*-url` pair, the editor keeps showing a **text box, not a URL editor** — so the button looks "hardcoded" even though the code is correct. Fixing the registry alone is not enough: the element must be **re-added** (fresh `url`-typed field) or its stored content migrated to a `{ url, text }` object via the authenticated API. New inserts under a `type="url"` registry are always correct.
+
 ## Adding a New Template — Checklist
 
 1. **Register the schema** in `TemplateRegistry` inside `Layout.tsx`:
