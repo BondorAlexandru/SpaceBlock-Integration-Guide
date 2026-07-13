@@ -46,15 +46,16 @@ Follow the structure and patterns from the SpaceBlock integration guide located 
 
    **Do NOT write a browser-side `register-global-elements.ts` helper that PUTs defaults on app boot.** CORS blocks PUT requests from browser origins on the public API, so the call always fails. Use the Node-based `scripts/seed-global-elements.mjs` (see step 6b) instead — it runs server-side where CORS doesn't apply. Both Navbar and Footer should still have robust default content baked into the component — that's the safety net before/if the seed runs.
 
-   > **Prefer hardcoding the navbar/footer.** The production norm (e.g.
-   > accessmemory.co) is to keep the navbar/footer as **static markup in code**
-   > — the CMS owns page content, the site owns its chrome. This avoids the
-   > global-element "Permanent Element" JSON editor entirely: no records, no
-   > seeding, no JSON. Only make them CMS-editable if the client truly needs it
-   > **and** your dashboard has the dedicated navbar/footer editors; if it shows
-   > raw JSON, fall back to `data-cms-id` content fields (and create **no**
-   > global-element record, or it shadows the fields). See
-   > [Global Elements](../10-global-elements.md).
+   > **To make navbar/footer editable as a visual FORM (not raw JSON), seed a
+   > `customization.fields` schema on the global element** — this is the key
+   > detail. `{ key, type, label }` per field, and `type: "list"` for repeatable
+   > groups (nav items, footer columns/links), which the editor renders with
+   > Add + drag-to-reorder. Without it the dashboard shows "No field schema
+   > defined … Edit as JSON". Keep `content` (values) in the same shape as the
+   > schema. See [Global Elements → the `customization.fields` schema](../10-global-elements.md).
+   > (If a client's chrome never changes, hardcoding it in `Navbar.tsx`/`Footer.tsx`
+   > and skipping the CMS entirely is also fine — but the schema is what unlocks
+   > the visual editor.)
 
 6b. **scripts/seed-global-elements.mjs + `npm run seed:globals`** — a small Node script that reads `.env.local`, fetches existing global elements, and PUTs ones whose `elementId` is missing. Idempotent. Use this instead of trying to PUT from the browser. Add `"seed:globals": "node scripts/seed-global-elements.mjs"` to package.json scripts. The script defines `DEFAULT_GLOBAL_ELEMENTS` (navbar + footer with defaults matching the Navbar/Footer components' content shapes).
 

@@ -2,41 +2,60 @@
 
 Global elements (navbar, footer, CTA, etc.) are configured once per project and available on every page. They live in `src/components/layout/`.
 
-> ## ⚠️ Read this before making the navbar/footer a global element
+> ## ⭐ Give global elements a visual form editor with `customization.fields`
 >
-> **The default, production-proven pattern is to keep the navbar and footer
-> HARDCODED in code — not CMS-managed at all.** Real SpaceBlock sites do this:
-> e.g. accessmemory.co has ~99 `data-cms-id` fields across its page content but
-> **zero** inside its `<nav>` or `<footer>` — the CMS owns the page, the site
-> owns its chrome. This sidesteps every problem below.
+> **This is the most important thing to know about global elements.** By
+> default the dashboard renders a global element as a **raw JSON editor**
+> ("No field schema defined for this element type. Edit as JSON"). To get the
+> friendly **form editor** — labelled inputs, repeatable lists with "Add" and
+> drag-to-reorder — put a **field schema in the element's `customization`**:
 >
-> Why you'll hit problems if you make navbar/footer CMS elements:
+> ```jsonc
+> {
+>   "elementId": "footer",
+>   "type": "footer",
+>   "content": { "columns": [ { "title": "Programs", "links": [ … ] } ], … },
+>   "customization": {
+>     "fields": [
+>       { "key": "tagline", "type": "text", "label": "Tagline" },
+>       { "key": "columns", "type": "list", "label": "Navigation Columns",
+>         "fields": [
+>           { "key": "title", "type": "text", "label": "Column Title" },
+>           { "key": "links", "type": "list", "label": "Links", "fields": [
+>             { "key": "label", "type": "text", "label": "Label" },
+>             { "key": "path",  "type": "url",  "label": "Path" }
+>           ] }
+>         ] }
+>     ]
+>   }
+> }
+> ```
 >
-> 1. **No field schema.** A global element's editor is chosen **solely by its
->    `type`**. `navbar`/`footer`/`cta` *may* have dedicated form editors, but
->    **any dashboard build without them falls back to a raw JSON editor**, and
->    there is **no** `schema`/`template` you can define to add fields (unlike
->    [templates](./03-templates.md) or [collections](./07-collections.md)).
-> 2. **Permanent Element shadowing.** Once a `navbar`/`footer` global-element
->    **record exists**, the editor surfaces it as a **"Permanent Element"** with
->    the JSON editor whenever you click that region — **even if you also render
->    per-field `data-cms-id` content**. The record wins.
-> 3. **You can't remove it from code.** The public API can only **deactivate**
->    (`isActive:false`), **not hard-delete**, a global element. A lingering
->    record keeps showing the Permanent Element panel until someone deletes it
->    in the dashboard.
+> Rules:
+> - Each field is `{ key, type, label, placeholder? }`. Field `type`s:
+>   `text`, `url`, `email`, `image`, `select` (+ `options`), `toggle`, `rating`.
+> - **`type: "list"`** is a repeatable group; give it its own nested `fields`.
+>   Lists nest (e.g. `columns` → each has a `links` list). The editor renders
+>   each list with drag-to-reorder + an **Add** button automatically.
+> - `content` holds the **values** in the exact shape the schema describes;
+>   `customization.fields` holds the **schema**. Keep the two in sync.
+> - Seed both via the public `PUT /api/public/global-elements/{projectId}`
+>   (the API-key upsert accepts `customization`). No dashboard build flag is
+>   needed — the form is driven entirely by this schema.
 >
-> **Guidance:**
+> Your React component still just **reads** `content` (via `fetchGlobalElement`)
+> and re-renders on `GLOBAL_ELEMENT_UPDATE` — see the rest of this chapter.
 >
-> - **Rarely-changing chrome (most navbars/footers): hardcode it** in
->   `Navbar.tsx` / `Footer.tsx` as static markup. Done — no records, no JSON.
-> - **Need per-field editing AND your dashboard lacks the navbar/footer
->   editors:** use **`data-cms-id` content fields** (see
->   [Navbar & Footer as content fields](#navbar--footer-as-content-fields)) —
->   but **do not also create a navbar/footer global-element record**, or the
->   Permanent Element panel (point 2) will shadow your fields.
-> - **Your dashboard has the dedicated `navbar`/`footer`/`cta` editors:** use
->   real global elements as described in the rest of this chapter.
+> ### Gotchas
+> - **An element with `customization: {}` (or missing) → JSON editor.** That's
+>   the #1 cause of "why is my navbar showing as JSON?". Add the schema.
+> - **Deleting is dashboard/session only.** The public API can `PUT`
+>   (create/update/`isActive:false`) but **not** hard-delete; `DELETE` needs a
+>   logged-in session (`/api/projects/{projectId}/global-elements/{id}`, by the
+>   record's **UUID `id`**, not its `elementId`).
+> - Prefer **one** editing model per region: a global element **or**
+>   `data-cms-id` content fields, not both — a global-element record surfaces a
+>   "Permanent Element" panel that shadows inline fields in the same region.
 
 ## Creating Global Elements
 
