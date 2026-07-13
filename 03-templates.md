@@ -206,32 +206,41 @@ function renderElement(element: PageElement) {
 - **`findValue(content, suffix)`** — locates a field by suffix and unwraps `{ url, text }` objects.
 - **`findImage(content, ...suffixes)`** — tries multiple suffixes in order and unwraps `{ url }` objects. Use it for any image field; the CMS sometimes returns plain strings, sometimes `{ url }`.
 
-## Links & Buttons — never hardcode a destination
+## Links & Buttons — two text fields, never hardcode a destination
 
-**Every link a visitor can click must be an editable `url` field. Do not hardcode `href`/`to` for content links.** A `url` field stores **both** the destination and the label in one `{ url, text }` object, so the editor exposes a single URL editor for the button — no separate label/url split, no orphaned fields.
+**Every link a visitor can click must be editable. Do not hardcode `href`/`to` for content links.** Give each button **two plain-`text` fields** — a label and a raw-URL input:
 
-Three parts have to agree on the **same bare suffix** (e.g. `primary`):
+```
+primary-label   →  "View the menu"     (the visible button text)
+primary-link    →  "/menu"             (the destination — a raw text input)
+```
 
-1. **Registry** (`Layout.tsx`) — declare it `type="url"`:
+> **Why not a single `type="url"` field?** In practice the dashboard renders a `url` field inconsistently and, when the stored value is the `{ url, text }` object shape, serves it back as a `text` block whose value stringifies to `[object Object]` in the live SDK. Two plain `text` fields sidestep all of that: a `text` field is **always** a simple input, and its value is **always** a plain string that renders correctly. The editor shows one input for the label and one for the URL — exactly "type the link here".
+
+Three parts agree on the two suffixes:
+
+1. **Registry** (`Layout.tsx`) — two text fields per button:
    ```tsx
-   <span data-cms-id="primary" data-cms-type="url" />
+   <span data-cms-id="primary-label" data-cms-type="text" />
+   <span data-cms-id="primary-link"  data-cms-type="text" />
    ```
-2. **Renderer** — read it with `findLink` (unwraps `{ url, text }`) and render a `CmsButton`:
+2. **Renderer** — read both with `findValue` and pass to `CmsButton`:
    ```tsx
-   const primary = findLink(content, 'primary')
-   <CmsButton id={fid('primary')} url={primary.url} label={primary.text}
-              fallbackUrl="/menu" fallbackLabel="View the menu" />
+   <CmsButton
+     labelId={fid('primary-label')} linkId={fid('primary-link')}
+     label={findValue(content, 'primary-label')}
+     url={findValue(content, 'primary-link')}
+     fallbackUrl="/menu" fallbackLabel="View the menu" />
    ```
-3. **`findLink(content, suffix)`** (in `DynamicPage.tsx`) — returns `{ url, text }` for an object field, or `{ url: string }` for a bare string.
+3. `findValue` returns the plain string for each (no unwrapping needed).
 
-`CmsButton` (in `sections/_cms.tsx`) is the single source of truth for rendering a link field. It:
-- emits `data-cms-id` + `data-cms-type="url"` so the field is **editable in place**;
-- renders a **plain `<a href>`, never react-router `<Link>`** — the SDK intercepts `<a>` clicks to open the URL editor, whereas a `<Link>` navigates away instead. (Full-page loads on internal links are fine given the SPA fallback in `public/_redirects`.)
-- **validates the stored value**: only a string starting with a scheme, `/` or `#` is used; anything else (e.g. a label that leaked into the URL field) falls back to `fallbackUrl`. An empty label falls back to `fallbackLabel`.
+`CmsButton` (in `sections/_cms.tsx`) is the single source of truth. It:
+- renders the **label** in a `<span data-cms-id=… data-cms-type="text">` **inside** the anchor, so it stays click-to-edit and updates live;
+- emits the **URL** as an **editor-only** text marker (`<EditorOnly><HiddenText …/></EditorOnly>`), so it appears as its own input in the element's field list but is never shipped to public visitors;
+- renders a **plain `<a href>`, never react-router `<Link>`** (a `<Link>` would navigate away instead of letting the SDK intercept the click). Full-page loads on internal links are fine given the SPA fallback in `public/_redirects`.
+- **validates the stored URL**: only a value starting with a scheme, `/` or `#` is used; anything else falls back to `fallbackUrl`. An empty label falls back to `fallbackLabel`. These fallbacks are safety nets, not the real link.
 
-The `fallbackUrl`/`fallbackLabel` are **safety nets for empty/bad data, not the real link** — the real link always comes from the editable field.
-
-> ⚠️ **Legacy-data gotcha.** The dashboard types each field from the element's **stored** value, not the live registry. If an element was first saved when the field was `text` (label only) or a split `*-label`/`*-url` pair, the editor keeps showing a **text box, not a URL editor** — so the button looks "hardcoded" even though the code is correct. Fixing the registry alone is not enough: the element must be **re-added** (fresh `url`-typed field) or its stored content migrated to a `{ url, text }` object via the authenticated API. New inserts under a `type="url"` registry are always correct.
+> ⚠️ **Schema is captured per element, from the registry.** The dashboard builds each element's field list from the `data-cms-insertable` template it was inserted from (synced to the server via the SDK's `CMS_TEMPLATES_DETECTED` message whenever the editor loads). So changing the registry updates the schema for **new** inserts automatically, and for **existing** elements the next time the editor opens. If an element still shows the old fields, delete and re-add it, then migrate its content (`PATCH /api/projects/{pid}/pages/{pageId}/elements/{elementId}` with the new `{ "<prefix>-label": "…", "<prefix>-link": "…" }` keys; the PATCH **merges**, so set superseded keys to `null`).
 
 ## Adding a New Template — Checklist
 
