@@ -2,6 +2,24 @@
 
 Global elements (navbar, footer, CTA, etc.) are configured once per project and available on every page. They live in `src/components/layout/`.
 
+> ## ⚠️ Global elements have no field schema — you may want content fields instead
+>
+> A global element's editor is chosen **solely by its `type`**: `navbar`,
+> `footer`, and `cta` have dedicated form editors; **every other type — and any
+> dashboard build that lacks those editors — falls back to a raw JSON editor.**
+> There is **no** `schema`/`template` you can define to add fields (unlike
+> [templates](./03-templates.md) or [collections](./07-collections.md)), and
+> global elements **cannot** be declared in the DOM.
+>
+> So if editors see raw JSON for the navbar/footer and you want real fields,
+> the fix is **not** on the global-element side. Render those regions as
+> ordinary **`data-cms-id` content fields** instead — see
+> [Navbar & Footer as content fields](#navbar--footer-as-content-fields) below.
+> Content fields get the normal per-field editors (text / rich-text / url /
+> image) in **any** dashboard, and because content is project-wide they are
+> still global. Reserve real global elements for when your dashboard is known
+> to have the dedicated `navbar`/`footer`/`cta` editors.
+
 ## Creating Global Elements
 
 Global elements are **created in the SpaceBlock dashboard**, not from your app at runtime. Your React app only **reads** global elements (via `fetchGlobalElement`) and listens for `GLOBAL_ELEMENT_UPDATE` postMessage events from the editor.
@@ -318,6 +336,83 @@ The CMS Visual Editor sends these `postMessage` events:
 | `CMS_REFRESH_AFTER_DELETE` | — | Re-fetch page |
 
 Each global element component listens for its own `GLOBAL_ELEMENT_UPDATE` event (filtered by `elementType`). `DynamicPage` handles the page-level events.
+
+## Navbar & Footer as content fields
+
+When your dashboard shows raw JSON for the navbar/footer (see the warning at the
+top), skip the global-element type entirely and build them from **`data-cms-id`
+content fields**. Each part becomes a normal inline-editable field, content is
+project-wide (so it's global), and it works in every dashboard build.
+
+### A tiny content hook
+
+Content blocks are edited by clicking the visible element; keep them live with a
+small hook that fetches all content and patches on `CMS_UPDATE`:
+
+```tsx
+// src/lib/useCmsContent.ts — fetch content blocks + live-update on edit.
+export function useCmsContent() {
+  const [content, setContent] = useState<Record<string, CmsFieldValue>>({})
+  useEffect(() => { fetchContent().then(setContent).catch(() => {}) }, [])
+  useEffect(() => {
+    const on = (e: MessageEvent) => {
+      const m = e.data
+      if (m?.type === 'CMS_UPDATE' && typeof m.cmsId === 'string')
+        setContent(prev => ({ ...prev, [m.cmsId]: m.content }))
+    }
+    window.addEventListener('message', on)
+    return () => window.removeEventListener('message', on)
+  }, [])
+
+  const text = (id: string, fb = '') => {
+    const v = content[id]
+    return (typeof v === 'object' && v ? (v.text ?? v.url ?? '') : v ? String(v) : '') || fb
+  }
+  // A `url` field carries BOTH a destination and a label ({ url, text }).
+  const link = (id: string, fbLabel = '', fbUrl = '#') => {
+    const v = content[id]
+    if (v && typeof v === 'object') return { label: v.text || fbLabel, url: v.url || fbUrl }
+    if (typeof v === 'string' && v) return { label: fbLabel, url: v }
+    return { label: fbLabel, url: fbUrl }
+  }
+  return { text, link }
+}
+```
+
+`fetchContent()` must return the **raw** value (don't flatten `{ url, text }`),
+so the hook can recover a link's label and destination.
+
+### Fixed fields + numbered link slots
+
+Render single values as `text`/`url` fields, and repeating lists (nav items,
+footer link columns) as numbered slots (`navbar-link-N`, `footer-explore-N`).
+Keep empty slots editable in the editor so items can be added, but hide them on
+the public site:
+
+```tsx
+const items = Array.from({ length: 6 }, (_, i) => {
+  const n = i + 1
+  const d = DEFAULT_NAV[i]
+  const { label, url } = link(`navbar-link-${n}`, d?.label ?? '', d?.url ?? '/')
+  return { n, label, url }
+}).filter(it => it.label || isInCmsEditor())  // empty slots: editor-only
+
+// <a data-cms-id={`navbar-link-${n}`} data-cms-type="url" href={url}>{label}</a>
+// <span data-cms-id="footer-copyright" data-cms-type="text">{text('footer-copyright','…')}</span>
+```
+
+### Responsive caveat — don't duplicate `data-cms-id`
+
+A field's `data-cms-id` must appear **once** in the DOM. If your navbar renders
+links in both a desktop bar and a mobile dropdown, put the editable
+`data-cms-id` links in **one** of them (typically the desktop bar) and render
+the other as plain, non-editable copies — otherwise the SDK sees duplicate IDs.
+Editors then edit the navbar at the width where the editable copy is visible.
+
+### No seeding needed
+
+Content fields are created the first time you edit them, so there's nothing to
+seed — `scripts/seed-global-elements.mjs` only matters for real global elements.
 
 ## Best Practices
 
