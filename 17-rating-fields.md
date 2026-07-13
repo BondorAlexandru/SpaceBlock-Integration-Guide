@@ -44,17 +44,26 @@ editor sidebar, grouped separately from everything else — including
   special-cases rating fields (and the SDK's `_handleRating` matches any
   `cmsId` containing `-rating`).
 
-> **If you need the control inline in a slot accordion instead** (e.g. edited
-> right next to the quote and author), you cannot use a rating field. Use a
-> `select` with numeric options instead — the accordion inlines `select`:
+> **Trying to move it into a slot accordion? It fights back.** The dashboard
+> renders a rating control for more than just the native field:
+>
+> - A native `data-cms-rating` field → star picker in the **"Star Ratings"** panel.
+> - A field whose key contains `rating` → hoisted into that panel even when typed
+>   as `select`.
+> - **A numeric `1–5` `select` (e.g. `data-cms-options="5,4,3,2,1"`) is *also*
+>   rendered as a star control** — the numeric 1–5 pattern is enough, regardless
+>   of the field name.
+>
+> So a "put it in the accordion as a plain dropdown" workaround needs
+> **non-numeric option labels** to avoid the star treatment:
 >
 > ```html
-> <span data-cms-id="quote-1-score" data-cms-type="select" data-cms-options="5,4,3,2,1"></span>
+> <span data-cms-id="quote-1-score" data-cms-type="select"
+>       data-cms-options="Excellent,Great,Good,Fair,Poor"></span>
 > ```
 >
-> Trade-off: a dropdown, not a star picker. **Avoid the substring `rating`** in
-> the field name for this workaround — the dashboard hoists anything matching
-> `-rating` into the Star Ratings panel even when typed as `select`.
+> If you genuinely want *no* rating control at all, see
+> [Removing the rating control](#removing-the-rating-control).
 
 ## Stored content shape
 
@@ -150,6 +159,27 @@ const value =
 applyFieldUpdate(cmsId, value)
 ```
 
+## Removing the rating control
+
+If a design shows a **fixed** star count (e.g. every testimonial displays five
+stars) and you do **not** want an editable rating in the CMS at all, the only
+reliable way to make the control disappear is to **not declare the field** —
+neither a `data-cms-rating` element nor a numeric `select`. Render the stars
+statically in your component:
+
+```tsx
+// No CMS field. Fixed five stars — nothing for the dashboard to turn into a
+// rating widget.
+<Stars count={5} />
+```
+
+Because the dashboard captures each template's field **schema at insert time**
+(from `CMS_TEMPLATES_DETECTED`) and **stores it on the element**, removing the
+field from your registry does **not** retroactively clean elements that were
+inserted while the field still existed. **Delete and re-insert** those elements
+so they pick up the current, rating-free schema. A page reload alone will not
+drop the field — it lives in the element's saved schema, not the live DOM.
+
 ## Checklist
 
 1. Declare the field with the **`data-cms-rating`** attribute (not
@@ -160,6 +190,10 @@ applyFieldUpdate(cmsId, value)
    colours with `!important` (Option B).
 5. Keep `elementId`-prefixed keys (`${elementId}-quote-1-rating`) like every
    other field so live preview and page fetch resolve them.
+6. A numeric `1–5` `select` is rendered as a star control too — use non-numeric
+   labels for a plain dropdown, or omit the field to remove the control.
+7. Removing a field does not clean already-inserted elements — **delete and
+   re-add** them, since the schema is captured and stored at insert time.
 
 ## Next Steps
 
