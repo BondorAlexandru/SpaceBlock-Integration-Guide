@@ -2,6 +2,29 @@
 
 Welcome to the SpaceBlock CMS integration guide. This documentation covers integrating SpaceBlock into a React + Vite + TypeScript + Tailwind application.
 
+## Using this guide in a new project (required)
+
+**Copy this entire folder into every project that integrates SpaceBlock** —
+e.g. as `docs/spaceblock/` — so the docs AND the rules travel with the code:
+
+```bash
+cp -r SpaceBlock-Integration-Guide your-app/docs/spaceblock
+```
+
+This folder ships a [`CLAUDE.md`](./CLAUDE.md) with binding integration rules
+(stable `data-cms-id`s, SDK init from env vars, path parity with CMS pages,
+public-API-only, …). After copying, add one line to your project's root
+`CLAUDE.md` so AI tooling always applies them:
+
+```
+SpaceBlock integration: ALWAYS follow docs/spaceblock/CLAUDE.md and consult
+the numbered guides in that folder before writing any CMS-related code.
+```
+
+Keeping a copy in the repo (rather than linking out) is what makes the rules
+apply on every future change — new pages, new sections, refactors — without
+anyone having to remember them.
+
 ## Recommended Project Structure
 
 ```
