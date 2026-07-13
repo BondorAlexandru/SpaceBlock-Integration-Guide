@@ -73,15 +73,17 @@ The PUT endpoint at `/api/public/global-elements/:projectId` exists, but **CORS 
    - `navbar` (type: `navbar`)
    - `footer` (type: `footer`)
    - `cta` (type: `cta`) — only if you're using `GlobalCta`
-4. Fill in the content shape your component expects (see "Content Types" below).
+4. Fill in the `content` shape your component expects (see "Content Types" below).
+5. **Give it a `customization.fields` schema** so editors get the visual form
+   instead of raw JSON — this is the important step (see the ⭐ box at the top).
 
 After they exist in the CMS, your `Navbar` / `Footer` components fetch them on mount and re-render on every editor change.
 
 ### Server-side seeding via `npm run seed:globals`
 
-The recommended way to bootstrap navbar/footer (and any future global elements) is a Node script invoked via npm. CORS doesn't apply to Node, so PUT works.
+The recommended way to bootstrap navbar/footer (and any future global elements) is a Node script invoked via npm. CORS doesn't apply to Node, so PUT works. **Each seeded element carries both `content` (values) and `customization` (the `fields` schema)** so it lands editor-ready as a form, not JSON.
 
-`scripts/seed-global-elements.mjs` reads `.env.local`, fetches the existing elements, and only PUTs ones whose `elementId` is missing — so re-running it is safe and won't clobber editor changes.
+`scripts/seed-global-elements.mjs` reads `.env.local`, fetches the existing elements, and only PUTs ones whose `elementId` is missing — so re-running it is safe and won't clobber editor changes. (Because it skips existing elementIds, updating a schema later means PUTting that element again explicitly, or deleting it first in the dashboard.)
 
 ```bash
 npm run seed:globals
@@ -124,7 +126,7 @@ Repeat for `footer`, etc. PUT is an upsert — it creates if missing, updates if
 | `elementId` | Yes | Unique ID within the project (e.g. `"navbar"`) |
 | `type` | Yes | Element type — drives which CMS editor is shown |
 | `content` | No | JSON content object (defaults to `{}`) |
-| `customization` | No | JSON customization object (defaults to `{}`) |
+| `customization` | No | **Field schema** — `{ fields: [{ key, type, label, placeholder? }] }`. This is what drives the visual form editor (see the ⭐ box at the top). Empty/missing → raw-JSON editor. |
 | `order` | No | Display order (auto-assigned if omitted) |
 | `isActive` | No | Whether element is active (defaults to `true`) |
 
@@ -374,19 +376,19 @@ The CMS Visual Editor sends these `postMessage` events:
 
 Each global element component listens for its own `GLOBAL_ELEMENT_UPDATE` event (filtered by `elementType`). `DynamicPage` handles the page-level events.
 
-## Navbar & Footer as content fields
+## Alternative: Navbar & Footer as content fields
 
-> Only reach for this if you genuinely need per-field editing of the navbar/
-> footer **and** your dashboard lacks the dedicated editors. For most sites,
-> **hardcoding is simpler and is the production norm** (see the warning at the
-> top). **Critical:** this approach only works if there is **no** `navbar`/
-> `footer` global-element record — an existing record surfaces the "Permanent
-> Element" JSON panel and shadows these fields. Delete any such record in the
-> dashboard first (the public API can't hard-delete it).
+> **Prefer a global element with a `customization.fields` schema (the ⭐ box at
+> the top) — that's the recommended path and gives editors one consolidated form.**
+> This content-field approach is a fallback for when you specifically want
+> inline, click-the-element editing instead. **Critical:** it only works if
+> there is **no** `navbar`/`footer` global-element record — an existing record
+> surfaces the "Permanent Element" panel that shadows these inline fields (pick
+> one model per region, not both). Hardcoding the chrome and skipping the CMS
+> entirely is also perfectly fine when it rarely changes.
 
-When your dashboard shows raw JSON for the navbar/footer, skip the
-global-element type entirely and build them from **`data-cms-id` content
-fields**. Each part becomes a normal inline-editable field, content is
+This builds the navbar/footer from **`data-cms-id` content fields** instead of a
+global element. Each part becomes a normal inline-editable field, content is
 project-wide (so it's global), and it works in every dashboard build.
 
 ### A tiny content hook

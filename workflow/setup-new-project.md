@@ -57,7 +57,7 @@ Follow the structure and patterns from the SpaceBlock integration guide located 
    > and skipping the CMS entirely is also fine — but the schema is what unlocks
    > the visual editor.)
 
-6b. **scripts/seed-global-elements.mjs + `npm run seed:globals`** — a small Node script that reads `.env.local`, fetches existing global elements, and PUTs ones whose `elementId` is missing. Idempotent. Use this instead of trying to PUT from the browser. Add `"seed:globals": "node scripts/seed-global-elements.mjs"` to package.json scripts. The script defines `DEFAULT_GLOBAL_ELEMENTS` (navbar + footer with defaults matching the Navbar/Footer components' content shapes).
+6b. **scripts/seed-global-elements.mjs + `npm run seed:globals`** — a small Node script that reads `.env.local`, fetches existing global elements, and PUTs ones whose `elementId` is missing. Idempotent. Use this instead of trying to PUT from the browser. Add `"seed:globals": "node scripts/seed-global-elements.mjs"` to package.json scripts. `DEFAULT_GLOBAL_ELEMENTS` defines navbar + footer, each with **`content` (values) AND `customization` (the `fields` schema)** — the `customization` schema is what makes the dashboard show the visual form editor instead of raw JSON, so don't omit it.
 
 7. **src/components/layout/Layout.tsx** — exports `Layout` wrapping `<Navbar /> <main className="flex-1 pt-16">{children}</main> <Footer /> <TemplateRegistry />`. `TemplateRegistry` is a **private function component in the same file** (not exported, not separate). It only renders inside the CMS iframe (`window.self !== window.top`) and lives inside a visually-hidden div: `className="absolute w-px h-px p-0 -m-px overflow-hidden [clip:rect(0,0,0,0)] whitespace-nowrap border-0"`.
 
