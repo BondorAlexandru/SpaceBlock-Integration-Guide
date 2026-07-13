@@ -100,6 +100,8 @@ export function Showcase({
             <div className={`relative overflow-hidden bg-gray-100 group ${aspectClass(project.variant)}`}>
               {project.image && (
                 <img
+                  data-cms-id={id(`project-${project.slot}-image`)}
+                  data-cms-type="image"
                   src={project.image}
                   alt={project.client || ''}
                   className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -107,7 +109,11 @@ export function Showcase({
               )}
               {(project.client || isTemplateMode) && (
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
-                  <span className="text-white text-sm font-medium">
+                  <span
+                    data-cms-id={id(`project-${project.slot}-client`)}
+                    data-cms-type="text"
+                    className="text-white text-sm font-medium"
+                  >
                     {project.client || 'Client Name'}
                   </span>
                 </div>
@@ -125,22 +131,23 @@ export function Showcase({
         })}
       </div>
 
-      {/* Hidden CMS fields — 60 numbered slots */}
+      {/* Hidden CMS fields — one group per numbered slot. `image` and `client`
+          are click-to-edit on the visible card above, so their hidden markers are
+          emitted only for EMPTY slots (so the editor can still discover and fill
+          them). Fields with no visible click target — tags, url, order and the
+          `variant` select — stay hidden markers for every slot. */}
       {Array.from({ length: SLOT_COUNT }, (_, i) => {
         const n = i + 1
         const p = projects[i]
+        const shown = !!(p && (p.image || p.client))
         return (
           <Fragment key={n}>
-            <img
-              data-cms-id={id(`project-${n}-image`)}
-              data-cms-type="image"
-              src={p?.image || undefined}
-              alt=""
-              className="hidden"
-            />
-            <span data-cms-id={id(`project-${n}-client`)} data-cms-type="text" className="hidden">
-              {p?.client}
-            </span>
+            {!shown && (
+              <>
+                <img data-cms-id={id(`project-${n}-image`)} data-cms-type="image" src={undefined} alt="" className="hidden" />
+                <span data-cms-id={id(`project-${n}-client`)} data-cms-type="text" className="hidden" />
+              </>
+            )}
             <span data-cms-id={id(`project-${n}-tags`)} data-cms-type="text" className="hidden">
               {p?.tags}
             </span>
@@ -172,7 +179,8 @@ export function Showcase({
 
 ### Key points
 
-- `SLOT_COUNT = 60` — all 60 hidden field groups are always rendered so the CMS can discover them. Only slots with content are displayed.
+- `SLOT_COUNT = 60` — a hidden `order` marker (and any field with no visible click target) is rendered for all 60 slots so the CMS can discover every slot, including empty ones. Only slots with content render a visible card.
+- **Slot items are click-to-edit, not just panel-edit.** Put `data-cms-id` (+ `data-cms-type`) on the *visible* fields of each populated card — its text (`client`, a title, a body) and its visible `<img>` — exactly like single-value section fields, so editors can click a card in the preview to edit it. Emit the hidden `<EditorOnly>` markers *only* where there is no visible click target: **empty slots** (for discovery), the `order` field, and values shown as a glyph rather than text (an icon `select`, a star `score`). Binding the visible image directly (instead of an extra hidden marker) also stops the browser downloading each slot image twice. Note: `data-cms-type` without a matching `data-cms-id` does nothing — the id is what makes an element editable/clickable.
 - The `id()` helper produces bare suffixes in template mode and `${elementId}-suffix` in render mode.
 - `project-N-client` is the field used as the row label in the Visual Editor drag list — choose a human-readable identifier field for this role.
 - `project-N-order` starts at `n` (natural slot order) and is overwritten by the Visual Editor on each drag.
