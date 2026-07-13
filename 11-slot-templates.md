@@ -26,6 +26,12 @@ All fields for slot `N` share a common prefix: `project-N-`:
 
 The `client` field doubles as the row label in the Visual Editor drag list. The `order` field is hidden from the flat field list — it is written automatically when the editor reorders items.
 
+> **Rating fields are the exception.** A field carrying `data-cms-rating` (a
+> star rating) is **not** inlined into the slot accordion — the editor hoists
+> every rating field into a separate "Star Ratings" panel, even when it belongs
+> to a `<prefix>-N-*` family. If you want a per-slot score edited *inside* the
+> accordion, use a `select` instead. See [Rating Fields](./17-rating-fields.md).
+
 ## Showcase Component
 
 ```tsx
