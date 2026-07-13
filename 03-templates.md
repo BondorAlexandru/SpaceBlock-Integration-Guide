@@ -160,6 +160,16 @@ export function HeroBanner({
 
 The component does **not** emit `data-cms-insertable` — that's the registry's job. It just renders content with stable, syncable field IDs.
 
+### Built-in spacing — nothing to add
+
+Every element gets **Top / Bottom spacing controls, per device** (desktop / tablet / mobile) automatically, at the bottom of its edit panel in the visual editor. You do **not** add a field, prop, or style for this.
+
+The only requirement is the one you already meet: the component's root carries `data-cms-element-id={elementId}` (line above). The SDK stores the values on the element and injects a responsive outer-margin rule onto that root — so spacing works on your live site with no template code. Notes:
+
+- It sets outer **margin** (`margin-top` / `margin-bottom`) on the root element. Keep the root a normal block-level element (a `<section>`/`<div>`); don't wrap it so that margin can't take effect.
+- Each device is **independent**: desktop, tablet (≤1024px) and mobile (≤640px) can each hold their own value. A breakpoint left on **auto** inherits the next-larger one (desktop → tablet → mobile); an explicit number — **including `0`** — overrides that, so a smaller screen can have less or no margin.
+- Adjacent elements' margins collapse per normal CSS (the gap between two sections is the larger of the two, not the sum) — expected behavior.
+
 ### Field ID pattern
 
 | Context | `data-cms-id` value | Example |
