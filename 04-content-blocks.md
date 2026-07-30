@@ -89,7 +89,7 @@ function HomePage() {
 
 ### API Helper
 
-Use `fetchContent()` from `src/lib/api.ts` — it calls the public content endpoint and returns a `Record<string, string>` keyed by `contentId`:
+Use `fetchContent()` from `src/lib/api.ts` — it calls the public content endpoint and returns a `Record<string, string>` keyed by `cmsId`:
 
 ```typescript
 import { fetchContent } from '@/lib/api'
@@ -107,22 +107,39 @@ The underlying API returns:
 {
   "content": [
     {
-      "id": "abc123",
-      "contentId": "hero-title",
-      "content": "Welcome to Our Site",
+      "cmsId": "hero-title",
       "type": "text",
-      "projectId": "project-123"
+      "content": { "text": "Welcome to Our Site" },
+      "updatedAt": "2024-01-15T10:30:00Z"
     },
     {
-      "id": "def456",
-      "contentId": "hero-description",
-      "content": "<p>This is rich text content.</p>",
+      "cmsId": "hero-description",
       "type": "richtext",
-      "projectId": "project-123"
+      "content": { "text": "<p>This is rich text content.</p>" },
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "cmsId": "hero-image",
+      "type": "image",
+      "content": { "url": "https://cdn.example.com/hero.jpg" },
+      "updatedAt": "2024-01-15T10:30:00Z"
     }
   ]
 }
 ```
+
+> ⚠️ **Two things routinely trip people up here.**
+>
+> 1. The key is **`cmsId`**, not `contentId` — mapping the wrong one produces a
+>    map full of `undefined` keys and every field silently falls back.
+> 2. **`content` is a wrapper object, not a bare string.** Text and rich text
+>    arrive as `{ text }`, images as `{ url }`, and numeric fields as
+>    `{ count }` / `{ rating }`. Assigning it straight into a `Record<string,
+>    string>` renders `[object Object]` on the live site.
+>
+> Flatten with a helper rather than at each call site, and keep the raw value
+> around for `url` fields — those carry BOTH a destination and a label
+> (`{ url, text }`), and flattening early throws the label away.
 
 ## When to Use Content Blocks vs Page Elements
 
@@ -132,7 +149,7 @@ The underlying API returns:
 
 ## React Integration (Vite + React)
 
-Use `fetchContent()` from `src/lib/api.ts` which returns a `Record<string, string>` keyed by `contentId`:
+Use `fetchContent()` from `src/lib/api.ts` which returns a `Record<string, string>` keyed by `cmsId`:
 
 ```tsx
 // src/components/AnnouncementBanner.tsx — illustrative; this banner lives in code
@@ -162,15 +179,30 @@ export function AnnouncementBanner() {
 `fetchContent()` in `src/lib/api.ts`:
 
 ```typescript
+/** Unwrap the `{ text }` / `{ url }` wrapper the API returns. */
+function flatten(raw: unknown): string {
+  if (raw == null) return ''
+  if (typeof raw === 'string') return raw
+  if (typeof raw === 'object') {
+    const obj = raw as { text?: unknown; url?: unknown }
+    if (obj.text != null) return String(obj.text)
+    if (obj.url != null) return String(obj.url)
+  }
+  return String(raw)
+}
+
 export async function fetchContent(): Promise<Record<string, string>> {
-  const data = await get<{ content: ContentBlock[] }>(
-    publicUrl('/api/public/content', { projectId: PROJECT_ID }),
-  )
+  // No projectId parameter — this endpoint is keyed off the API key alone.
+  const data = await get<{ content: ContentBlock[] }>(publicUrl('/api/public/content'))
   const map: Record<string, string> = {}
-  for (const block of data.content) map[block.contentId] = block.content
+  for (const block of data.content) map[block.cmsId] = flatten(block.content)
   return map
 }
 ```
+
+If any of your fields are `url` type, return the **raw** value instead and
+flatten at the point of use — see the `useCmsContent` hook in
+[Global Elements](./10-global-elements.md), which needs both halves of a link.
 
 ## Naming Conventions
 
