@@ -206,8 +206,19 @@ useEffect(() => {
 | `GLOBAL_ELEMENT_UPDATE` | Global element (navbar/footer) content changed | `{ elementType, content }` |
 | `CMS_INSERT_ELEMENT` | New page element inserted | `{ elementId }` |
 | `CMS_REFRESH_AFTER_DELETE` | Element deleted from page | - |
-| `CMS_UPDATE` | Content block updated | `{ cmsId, content, contentType }` |
+| `CMS_UPDATE` | Content block or element field changed | `{ cmsId, content, contentType }` |
+| `CMS_GLOBAL_ELEMENT_SELECTED` | A global element was selected or deselected in the editor | `{ elementType, elementId }` — both `null` on deselect |
 | `CMS_CAPTURE_ELEMENT` | Editor requests a screenshot of an element for its template preview image | `{ elementId, cmsId? }` |
+
+`CMS_UPDATE` fires **as the editor types**, for content blocks and element
+fields alike — not only on save — so a consumer that patches its state from this
+message gets a live preview for free. It also fires on **Cancel**, carrying the
+last-saved values, so discarding an edit restores the preview. Treat it as
+"here is the current value of this field", never as "this was saved".
+
+`CMS_GLOBAL_ELEMENT_SELECTED` exists for global elements that aren't
+permanently on screen — see
+[Previewing a global element that isn't always visible](./10-global-elements.md#previewing-a-global-element-that-isnt-always-visible).
 
 ### Template Preview Capture
 

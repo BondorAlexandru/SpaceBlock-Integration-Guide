@@ -371,10 +371,84 @@ The CMS Visual Editor sends these `postMessage` events:
 | Type | Payload | Action |
 |------|---------|--------|
 | `GLOBAL_ELEMENT_UPDATE` | `{ elementType, content }` | Update Navbar, Footer, or CTA state directly |
+| `CMS_GLOBAL_ELEMENT_SELECTED` | `{ elementType, elementId }` | An element was selected (or deselected — both fields `null`) |
 | `CMS_INSERT_ELEMENT` | `{ elementId }` | Remove SDK-inserted DOM node, re-fetch page |
 | `CMS_REFRESH_AFTER_DELETE` | — | Re-fetch page |
 
 Each global element component listens for its own `GLOBAL_ELEMENT_UPDATE` event (filtered by `elementType`). `DynamicPage` handles the page-level events.
+
+## Previewing a global element that isn't always visible
+
+Navbars and footers are on screen permanently, so editing them is
+self-demonstrating. Anything **conditional** is not: a newsletter popup that
+appears after a five-minute delay, only to visitors who haven't dismissed it,
+is invisible in the editor. Selecting it shows a panel of fields with no way to
+see any of them — you're typing blind.
+
+`CMS_GLOBAL_ELEMENT_SELECTED` solves this. The editor emits it whenever a global
+element is selected or deselected; the consumer reveals the element for as long
+as it's selected.
+
+```tsx
+// src/lib/cms/hooks.ts — the `type` of the element being edited, or null.
+// Always null for public visitors: the listener only runs inside the iframe.
+export function useCmsSelectedGlobalElement(): string | null {
+  const [selected, setSelected] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isInCmsEditor()) return
+    function onMessage(event: MessageEvent) {
+      if (!isTrustedCmsOrigin(event.origin)) return
+      const data = event.data as { type?: string; elementType?: string | null }
+      if (data?.type !== 'CMS_GLOBAL_ELEMENT_SELECTED') return
+      setSelected(data.elementType ?? null)
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  return selected
+}
+```
+
+```tsx
+// App.tsx — force the popup open while it is the selected element.
+const isEditingPopup = useCmsSelectedGlobalElement() === 'popup'
+
+<NewsletterPopup
+  isOpen={shouldShow || isEditingPopup}
+  // Disable dismissal while editing, or the element vanishes mid-edit.
+  onClose={isEditingPopup ? () => {} : onClose}
+/>
+```
+
+Rules:
+
+- **Override visibility only, never content.** The delay, the dismissal memory
+  and any `isActive` toggle must still govern what real visitors get; the
+  editor override lives entirely behind `isInCmsEditor()`.
+- **Show it even when the element is switched off.** An editor has to be able to
+  work on a popup that is currently disabled.
+- **Disable the element's own dismiss/close action** while it's selected.
+- A modal covers the page while open, so the rest of the preview isn't
+  clickable until the editor deselects. That's expected.
+
+## `customization.fields` gotchas
+
+Two details that produce confusing failures rather than obvious ones:
+
+- **`options` on a `select` must be an ARRAY**, `["a","b"]` — not the
+  comma-separated string used by the `data-cms-options` DOM attribute. A string
+  is not something you can `.map`, and it takes the whole element editor down
+  with a runtime error rather than degrading that one field.
+- **`toggle` values round-trip as the STRINGS `"true"` / `"false"`**, not
+  booleans. `!"false"` is `false`, so naive negation reads an off switch as on.
+  Normalise on read:
+
+  ```ts
+  const isOn = (v: unknown) =>
+    typeof v === 'boolean' ? v : !['false', '0', 'off', ''].includes(String(v).trim().toLowerCase())
+  ```
 
 ## Alternative: Navbar & Footer as content fields
 

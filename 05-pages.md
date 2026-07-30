@@ -353,6 +353,68 @@ If a slug doesn't exist yet (e.g. fresh install with no `home` page in the CMS),
 
 This is the on-ramp: a fresh install will hit `/` → 404 on `home` → see the panel → know to create the page. The browser will still log the 404 in the network tab; that's expected and informative.
 
+## Retrofitting a site that already has pages
+
+Everything above assumes pages are composed in the CMS. When you're adding
+SpaceBlock to an existing site whose screens are hardcoded React, the model is
+inverted: composition stays in code and the CMS only edits the copy, via
+`data-cms-id` content blocks. Two things then have to be seeded, or the editor
+looks broken.
+
+**1. A `Page` record per route.** The Visual Editor is page-scoped — with zero
+pages it has nothing to open, so the preview stays empty and clicking does
+nothing. Create one page per route the site serves, with `path` matching
+exactly. Routes served dynamically (`/category/:slug`) need one record each;
+enumerate them from whatever the site itself uses, not by hand.
+
+> If one page is reachable at two URLs (say `/category/shirts` and the legacy
+> `/product-category/shirts`), derive the content-block namespace from the
+> shared slug rather than the full path, so both URLs edit **one** set of
+> fields. Otherwise editors fill in every page twice and can't tell which URL a
+> visitor will land on.
+
+**2. A `ContentBlock` per `data-cms-id`, pre-filled with the copy the site
+already renders.** This one is not optional. When the editor receives a click
+for a `data-cms-id` it has no block for, it **auto-creates one containing the
+literal text `Content for <cmsId>`** — and because a CMS value outranks the
+code fallback, that placeholder goes straight to the live site. Pre-seeding
+means that path never runs.
+
+Harvest the values from the running site rather than retyping them, so the
+seed can't drift from what visitors see:
+
+```js
+// Paste into the console on your dev server. A same-origin iframe makes the
+// page believe it's in the editor, so editor-only markers render too.
+const frame = document.createElement('iframe')
+frame.style.cssText = 'position:fixed;left:-9999px;width:1400px;height:900px'
+frame.src = route
+document.body.appendChild(frame)
+await new Promise(r => { frame.onload = r; setTimeout(r, 8000) })
+await new Promise(r => setTimeout(r, 1500))          // let React commit
+
+const doc = frame.contentDocument
+const registry = doc.getElementById('cms-templates')  // schema, not content
+doc.querySelectorAll('[data-cms-id]').forEach(el => {
+  if (registry?.contains(el)) return
+  const type = el.getAttribute('data-cms-type') || 'text'
+  blocks[el.getAttribute('data-cms-id')] = {
+    type,
+    value: el.tagName === 'IMG' ? el.src
+         : type === 'richtext' ? el.innerHTML.trim()
+         : el.textContent.trim(),
+  }
+})
+```
+
+Two cautions before you trust the output:
+
+- **Harvest against the real content**, not a local dev build whose hardcoded
+  fallbacks may be stale placeholders that no visitor has ever seen.
+- **Check every value is complete** — see
+  [Never bind `data-cms-id` to a shortened or derived value](./04-content-blocks.md#never-bind-data-cms-id-to-a-shortened-or-derived-value).
+  A bound node showing an excerpt yields an excerpt.
+
 ## Best Practices
 
 1. **One DynamicPage for all CMS routes** — use `/*` catch-all and derive the slug from `useLocation`.

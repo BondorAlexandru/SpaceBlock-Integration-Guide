@@ -141,6 +141,33 @@ The underlying API returns:
 > around for `url` fields — those carry BOTH a destination and a label
 > (`{ url, text }`), and flattening early throws the label away.
 
+### Plain-text blocks come back as HTML
+
+The dashboard edits **every** content block with a rich-text editor, including
+ones your site renders as a bare string. Saving the plain text
+`Stilul începe cu privirea` stores:
+
+```json
+{ "text": "<p>Stilul începe cu privirea</p>" }
+```
+
+Rendered as a React text node, that shows the visitor `<p>…</p>`. It only
+surfaces after the first edit, so it passes every check until an editor touches
+the field. Expose two readers and pick per field:
+
+```ts
+// Strips markup — for anything rendered as a text node (almost everything).
+cms.text('home-hero-title', 'Stilul începe cu privirea')
+
+// Raw — ONLY where the value goes through dangerouslySetInnerHTML.
+cms.html('boutique-address', '<p>Adina Buzatu</p><p>…</p>')
+```
+
+A workable stripper turns block-level tags into spaces (so `<p>a</p><p>b</p>`
+reads "a b"), removes the remaining tags, and decodes entities **after** tag
+removal — decoding first would turn an encoded `&lt;script&gt;` into a live one.
+Always sanitise whatever you pass to `dangerouslySetInnerHTML`.
+
 ## When to Use Content Blocks vs Page Elements
 
 **Prefer page elements** ([Pages & Elements](./05-pages.md)) for any composable page where editors should be able to add, remove, reorder, or swap sections. That includes the homepage and every marketing page in this project — they all flow through `DynamicPage`.
@@ -203,6 +230,83 @@ export async function fetchContent(): Promise<Record<string, string>> {
 If any of your fields are `url` type, return the **raw** value instead and
 flatten at the point of use — see the `useCmsContent` hook in
 [Global Elements](./10-global-elements.md), which needs both halves of a link.
+
+## A field is only editable if its node can be CLICKED
+
+The SDK binds click-to-edit to elements carrying `data-cms-id`. A marker hidden
+with `className="hidden"` satisfies "has the attribute" and fails "can be
+clicked" — the field exists, shows up in no panel, and can never be changed.
+
+This bites hardest on **buttons**, where the label is visible but the
+destination is not. Don't split them across two blocks with the URL in a hidden
+marker. Use ONE block of type `custom` holding both halves:
+
+```jsonc
+// content of the block `home-hero-cta`, type: "custom"
+{ "text": "DESCOPERĂ COLECȚIA", "url": "/categorie-produs/ochelari-de-soare" }
+```
+
+```tsx
+const cta = cms.link('home-hero-cta', 'DESCOPERĂ', '/magazin')  // { label, url }
+
+<a href={cta.url}>
+  <span data-cms-id="home-hero-cta" data-cms-type="url">{cta.label}</span>
+</a>
+```
+
+A `custom` block renders **one labelled input per key it holds**, so clicking
+the button opens a panel with a Text field and a Url field together. (Other
+types read fixed keys off an image-shaped scaffold, so they show `alt` / `fit` /
+`linkTarget` rows whether or not the block uses them.)
+
+When a destination genuinely has no visible element of its own — a whole card
+that is itself the link — give it one, rendered only inside the editor:
+
+```tsx
+{isInCmsEditor() && (
+  <span className="mt-2 inline-flex items-center gap-1 rounded bg-black/80 px-2 py-1 text-[11px] text-white">
+    🔗 <span data-cms-id={`card-${n}-link`} data-cms-type="url">{link}</span>
+  </span>
+)}
+```
+
+Keep that chip **outside** the flex/grid child that sizes the card, or it
+becomes a sibling column and breaks the row.
+
+## Never bind `data-cms-id` to a shortened or derived value
+
+Whatever is inside the bound element is what the editor shows you, and what it
+writes back on save. So the node must contain the **whole, exact** value.
+
+The classic way to get this wrong is a "read more" excerpt:
+
+```tsx
+{/* WRONG — the element holds a 300-character slice plus a button label. */}
+<p data-cms-id="collection-camasi-description">
+  {isExpanded ? description : description.slice(0, 300)}
+  <button>Citește mai mult</button>
+</p>
+```
+
+Saving that stores the excerpt as the real description and appends the button's
+text to it. In one project this silently truncated 28 category descriptions —
+849 characters down to 317 — before anyone noticed.
+
+```tsx
+{/* RIGHT — full text in the DOM, collapsed visually, control outside. */}
+<p data-cms-id="collection-camasi-description" className={expanded ? '' : 'line-clamp-4'}>
+  {description}
+</p>
+{isLong && <button onClick={toggle}>Citește mai mult</button>}
+```
+
+Clamping in CSS also keeps the whole text in the DOM for search engines. The
+same rule covers any transform: don't bind to uppercased, sentence-cased,
+formatted or otherwise-derived text — bind to the raw value and style it.
+
+> **Recovery note.** Once a value is in the CMS it overrides the code fallback,
+> so a bad value cannot be repaired by re-reading the rendered page — you'd read
+> your own bad data back. Recover from source.
 
 ## Naming Conventions
 
