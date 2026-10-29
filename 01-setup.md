@@ -177,6 +177,7 @@ React renders components before the SDK has seen the DOM. Setting `autoLoad: fal
 | `cacheEnabled` | boolean | `true` | Enable local content caching |
 | `hideUntilLoaded` | boolean | `true` | Hide content until loaded. Use `false` when React provides fallback values |
 | `debug` | boolean | `false` | Enable SDK debug logging |
+| `insights` | boolean | `true` | Load the first-party visitor insights script (pageviews, clicks, heat map). See [17-insights.md](./17-insights.md) |
 
 ## 5. SDK Methods
 

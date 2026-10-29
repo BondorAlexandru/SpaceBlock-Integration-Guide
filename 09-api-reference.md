@@ -536,7 +536,10 @@ GET /api/public/render/{projectId}               → home page (empty slug)
 - `?cms-preview=true` resolves unpublished/draft content and responds with
   `no-store`.
 - `og:image` / `og:url` / canonical are always absolute. The shell is fetched
-  from the project's configured **Site URL** and cached ~60s.
+  from the project's configured **Site URL** on every request (not cached), and
+  the response is never held at a CDN.
+- Optional (Project → SEO → **Include page text for crawlers**): also writes the
+  page's published text, hidden, into the SPA mount element for non-JS readers.
 
 See [SEO & Social Metadata](./12-seo-metadata.md) for the full guide, the exact
 tag block, fallback rules, and host-rewrite setup.
@@ -684,6 +687,16 @@ const navbarContent = elements[0]?.content
 ```
 
 ---
+
+### Analytics (insights beacon)
+
+```
+POST /api/public/analytics/events
+```
+
+Ingest endpoint for `spaceblock-insights.js`. Keyed by project id, body is JSON
+sent as `text/plain`, returns `204`. You don't call it directly — see
+[17-insights.md](./17-insights.md) for the payload and the privacy rules.
 
 ## Authenticated API Endpoints
 

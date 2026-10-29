@@ -133,10 +133,15 @@ What it does:
 
 1. Loads the page/post + its `seo`, resolving with the same fallback chain
    described above (per-field → page/post fields → **project SEO defaults**).
-2. Fetches the `index.html` shell (from the configured **Site URL**, cached
-   ~60s) and **replaces the block between `<!-- seo:start -->` and
+2. Fetches the `index.html` shell (from the configured **Site URL**, on every
+   request — never cached, so a fresh deploy of your site is picked up
+   immediately) and **replaces the block between `<!-- seo:start -->` and
    `<!-- seo:end -->`** with the resolved tags.
-3. Returns `text/html`. The SPA still boots and hydrates normally for human
+3. If **Include page text for crawlers** is on (see below), writes the page's
+   published text into your SPA's mount element.
+4. Returns `text/html` with `Cache-Control: public, max-age=0, must-revalidate`
+   and `CDN-Cache-Control: no-store` — it is never held at a CDN, so content
+   edits show on the next request. The SPA still boots normally for human
    visitors.
 
 Notes:
@@ -197,6 +202,35 @@ emitted into the page `<head>` only when filled in; blank values are silently sk
 | `bingVerification` | `<meta name="msvalidate.01">` | Bing Webmaster ownership verification. |
 | `organizationLogo` | (drives the JSON-LD below) | Square brand-mark URL. Opt-in: setting this emits an Organization schema block on every page. |
 | `organizationSameAs` | `sameAs:[...]` in the Organization schema | Newline-separated canonical social-profile / Wikipedia / Crunchbase URLs. Helps Google's brand knowledge panel verify the entity. Used only when `organizationLogo` is set. |
+| `prerenderContent` | (page body, not `<head>`) | **Include page text for crawlers.** Off by default. See below. |
+
+### Include page text for crawlers (`prerenderContent`)
+
+The `<head>` tags fix link previews, but the page *body* of a client-rendered
+SPA is still empty until JavaScript runs — so Bing, AI crawlers, link unfurlers
+and the chatbot's website processor see no text. Turning this on (Project → SEO)
+makes the render endpoint also write a **visually hidden, readable copy** of the
+page's published text — title, description, and the text of its elements and
+content blocks (blog posts: title, subtitle, excerpt, summaries, body) — as the
+first child of your mount element:
+
+```html
+<div id="root"><div data-spaceblock-prerender style="position:absolute;width:1px;…">
+  <article><h1>Delivery &amp; returns</h1><p>We ship in 2–3 days.</p>…</article>
+</div>…your existing children…</div>
+```
+
+Requirements and guarantees:
+
+- Your app must mount with React's **`createRoot`** (or any client render that
+  replaces the container's children) into `#root`, `#app` or `#__next`. The
+  copy is discarded the moment your app renders, so visitors never see it.
+- **Do not enable it if your site hydrates server-rendered HTML** (`hydrateRoot`):
+  the extra children would cause hydration mismatches.
+- If no such mount element is found in your shell, nothing is injected.
+- Published content only — never added in `cms-preview` mode.
+- Text only: URLs, colours, class names and other non-prose values are skipped,
+  everything is HTML-escaped, and the copy is capped at ~60k characters.
 
 ## 4. Host rewrite
 

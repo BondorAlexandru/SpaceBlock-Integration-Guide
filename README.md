@@ -73,6 +73,7 @@ index.html              ← SDK script loader
 14. [CDN Cache Invalidation](./14-cdn-cache-invalidation.md) — Sub-second content updates via signed purge webhooks
 15. [Component Builder](./15-components.md) — Build/import reusable components (incl. from Figma) that the SDK mounts on your site
 16. [Chatbot Widget](./16-chatbot-widget.md) — Embed the SpaceBlock chatbot widget
+17. [Visitor Insights](./17-insights.md) — First-party analytics beacon, click heat map, rule-based suggestions
 
 ## Quick Start
 

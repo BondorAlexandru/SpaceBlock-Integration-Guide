@@ -83,6 +83,40 @@ site usable — the full-page chat only appears on that route.
 - **Nothing renders until the chatbot is Published.** While it's a Draft the
   script loads but shows no launcher, so you can stage it safely. Publish from the
   Chatbot page to go live.
+- **Page context.** Every message also sends the address of the page the visitor
+  is on (`window.location.href`, read at send time, so client-side route changes
+  count) and their language (`navigator.language`). Only the address is sent —
+  never page content — and before sending, the `#fragment` and any query
+  parameter whose name looks like a credential (`token`, `key`, `code`, `auth`,
+  `session`, `email`, …) are removed; product parameters like `?id=` stay. The
+  assistant uses the page only when **page awareness** is on.
+- **Product cards (e-commerce bots).** When an answer recommends products, the
+  widget shows up to 6 cards under it — image, name, price, an "Out of stock"
+  badge — each linking to the product page (opens in a new tab, so the chat stays
+  open). Only `http(s)` links and images are ever rendered.
+
+## E-commerce bots: website processing & page awareness
+
+Set this up in **Chatbot → Settings → Website & shop**, then **Chatbot → Website**:
+
+1. **Chatbot type** — *General* or *E-commerce*. E-commerce adds a product
+   catalogue and lets answers carry product cards. Delivery/returns/about answers
+   work for both.
+2. **Website address** — your public site (e.g. `https://shop.com`).
+3. **Process website** (Website tab) — reads every public page into the
+   assistant's knowledge and, for shops, builds the product catalogue. Progress
+   shows live; "Last processed" is the moment prices and stock in answers are
+   from, so **Reprocess** after catalogue changes. Pages found appear under
+   Knowledge as "Website page"; uploaded and pasted sources are never touched.
+4. **The bot knows which page the visitor is on** — enables page awareness
+   ("Do you have this in blue?" on a product page). It uses the processed pages,
+   so process the website first.
+5. **Site language / English fallback** — the language is detected during
+   processing if left empty; the English fallback message is shown to
+   English-speaking visitors when the assistant can't answer.
+
+No code change is needed on your site: the same embed script sends the page
+context and renders product cards.
 
 ## Fully custom design (advanced)
 
@@ -117,6 +151,10 @@ placeholder, welcome text) still apply in custom mode.
 | `.cb-fs-nav` / `.cb-fs-bar` / `.cb-fs-logo` / `.cb-goback` | full-page navbar parts |
 | `.cb-fs-col` / `.cb-fs-list` | full-page centred column / message list |
 | `.cb-fs-form` / `.cb-fs-compose` | full-page composer and its input |
+| `.cb-products` | row of product cards under an answer (e-commerce) |
+| `.cb-product` (+ `.cb-product-oos` when out of stock) | one product card (an `<a>` when it has a link) |
+| `.cb-product-img` / `.cb-product-body` | card image / text area |
+| `.cb-product-name` / `.cb-product-price` / `.cb-product-badge` | card name, price, "Out of stock" badge |
 
 ### Example
 
@@ -164,6 +202,7 @@ const chat = window.SpaceBlockChatbot.createClient({
   onDelta: (text) => render(text),            // full assistant text so far (streams)
   onDone:  (text, history) => finalize(text), // stream finished
   onError: (message) => showError(message),   // rate limit / network / server error
+  onProducts: (items) => renderCards(items),  // e-commerce product cards (up to 6, see below)
 })
 
 await chat.send("What do you offer?")  // resolves true on success, false on error
@@ -174,7 +213,8 @@ chat.streaming()                       // boolean
 ```
 
 `createClient()` is available in **every** design mode, so you can also mix it
-with the rendered widget (e.g. a separate inline chat on one page).
+with the rendered widget (e.g. a separate inline chat on one page). It sends the
+page address and language with every message, like the widget.
 
 ### Option B — the raw HTTP contract (any stack, no script)
 
@@ -186,18 +226,48 @@ GET  /api/chatbot/{websiteId}/public-config
 
 POST /api/chatbot/{websiteId}/chat
      Content-Type: application/json
-     { "message": "Hi", "history": [{ "role": "user"|"assistant", "content": "…" }] }
+     {
+       "message": "Hi",
+       "history": [{ "role": "user"|"assistant", "content": "…" }],
+       "pageUrl": "https://shop.com/p/linen-shirt",   // optional: window.location.href
+       "language": "en-GB"                            // optional: navigator.language
+     }
      → Server-Sent Events stream
 ```
+
+`pageUrl` is only the address of the visitor's current page (re-read it on
+client-side route changes); it's ignored unless page awareness is enabled, and
+page content must never be sent. Strip the `#fragment` and any credential-like
+query parameters (tokens, codes, session ids, emails) before sending — the
+address is passed on to the AI provider. `language` only picks the English fallback
+message for failures that never reach the model.
 
 The SSE stream emits events with a JSON `data` payload:
 
 | Event | Payload | Meaning |
 | --- | --- | --- |
 | `delta` | `{ "text": "…" }` | Append to the current answer (token chunk). |
-| `message` | `{ "text": "…" }` | Full answer replacement (non-streaming fallback). |
-| `done` | `{}` | Answer complete. |
-| `error` | `{ "message"?: "…" }` | Something failed — show a retry affordance. |
+| `message` | `{ "text": "…" }` | Whole fallback message — the reply when the bot can't answer. |
+| `block` | `{ "type": "products", "items": [ProductCard] }` | E-commerce product cards, after the last `delta`. **Ignore unknown `type`s.** |
+| `done` | `{ "reason": "Completed" \| … }` | Always the last event. Any reason other than `Completed` means the `message` event carried the reply (`no_credentials`, `budget_exceeded`, `ProviderAuthFailed`, `ProviderUnavailable` — retry the last one). |
+| `error` | `{ "error": "not_configured" }` | The chatbot isn't set up; the stream ends. |
+
+A `ProductCard` is:
+
+```json
+{
+  "id": "guid", "url": "https://shop.com/p/linen-shirt", "name": "Linen Shirt",
+  "description": "Light and airy.", "imageUrl": "https://shop.com/img/linen.jpg",
+  "price": 49.0, "currency": "EUR", "availability": "InStock",
+  "category": "Shirts", "brand": "Brand", "language": "en"
+}
+```
+
+Up to 6 items, in the order the answer mentions them. `description`, `imageUrl`,
+`price`, `currency`, `availability` (`InStock` | `OutOfStock` | `PreOrder`),
+`category` and `brand` can each be `null` — render the card without them. The
+answer text never contains product links; the cards are the only links. Only
+render `http(s)` URLs.
 
 Notes for a from-scratch client:
 

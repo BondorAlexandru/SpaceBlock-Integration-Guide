@@ -9,7 +9,7 @@
 > the numbered guides in that folder before writing any CMS-related code.
 > ```
 >
-> The numbered guides (`01-setup.md` … `16-chatbot-widget.md`) are the
+> The numbered guides (`01-setup.md` … `17-insights.md`) are the
 > authoritative reference — these rules tell you WHEN a guide is mandatory
 > reading and what must never regress. When a rule and site code disagree,
 > surface it; don't silently pick one.
@@ -28,6 +28,7 @@
 | Numbered slot lists with reordering | `11-slot-templates.md` |
 | SEO/OG tags | `12-seo-metadata.md` |
 | Chatbot embed or a custom chat UI | `16-chatbot-widget.md` |
+| Analytics, the insights script, click tracking, heat map, `data-track` | `17-insights.md` |
 
 ## Absolute rules
 
